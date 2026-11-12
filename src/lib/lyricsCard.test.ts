@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CARD_FORMATS, luminance, wrap } from "./lyricsCard";
+import { arcaneNumber, CARD_FORMATS, CARD_STYLES, luminance, wrap } from "./lyricsCard";
 
 describe("carte de paroles", () => {
   const measure = (t: string) => t.length * 10;
@@ -26,5 +26,14 @@ describe("carte de paroles", () => {
 
   it("propose les formats des réseaux (carré, portrait 4:5, story 9:16)", () => {
     expect(CARD_FORMATS.map((f) => [f.id, f.height])).toEqual([["carre", 1080], ["portrait", 1350], ["story", 1920]]);
+  });
+
+  it("donne à chaque morceau un arcane stable, de I à XXI", () => {
+    const a = arcaneNumber("Bruxelles vie", "Damso");
+    expect(arcaneNumber("Bruxelles vie", "Damso")).toBe(a);
+    expect(a).toMatch(/^[IVX]+$/);
+    const seen = new Set(["A", "B", "C", "D", "E", "F", "G", "H"].map((t) => arcaneNumber(t, "x")));
+    expect(seen.size).toBeGreaterThan(3);
+    expect(CARD_STYLES.map((s) => s.id)).toContain("arcane");
   });
 });
