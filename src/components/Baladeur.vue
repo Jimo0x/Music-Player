@@ -15,6 +15,7 @@ import { useLibraryStore } from "@/stores/library";
 import { useLyricsStore } from "@/stores/lyrics";
 import { usePlayerStore } from "@/stores/player";
 import { usePlaylistsStore } from "@/stores/playlists";
+import { useUiStore } from "@/stores/ui";
 
 const baladeur = useBaladeurStore();
 const player = usePlayerStore();
@@ -22,6 +23,7 @@ const library = useLibraryStore();
 const playlists = usePlaylistsStore();
 const favorites = useFavoritesStore();
 const lyricsStore = useLyricsStore();
+const ui = useUiStore();
 const now = useNow();
 
 /** Lignes visibles dans une liste. */
@@ -461,6 +463,15 @@ onMounted(async () => {
 // ——— Démarrage ———
 const booting = ref(true);
 onMounted(() => setTimeout(() => (booting.value = false), 900));
+// Bouton retour d'Android : comme MENU (retour à l'écran précédent du baladeur).
+onMounted(() =>
+  ui.holdBack(() => {
+    touched();
+    tick(true);
+    back();
+  }),
+);
+onBeforeUnmount(() => ui.releaseBack());
 
 // Titre trop long pour l'écran : il défile.
 const titleBox = ref<HTMLElement | null>(null);

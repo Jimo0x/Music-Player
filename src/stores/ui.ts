@@ -82,6 +82,8 @@ export const useUiStore = defineStore("ui", {
     lyricsShare: false,
     /** Écran de téléphone : navigation par onglets en bas, lecteur compact. */
     isMobile: false,
+    /** Mode plein écran (baladeur) : le bouton retour d'Android lui est confié. */
+    overlayBack: null as (() => void) | null,
     /** Écran tactile (téléphone, tablette, pliable ouvert) : un appui lance un morceau. */
     isTouch: false,
   }),
@@ -117,7 +119,21 @@ export const useUiStore = defineStore("ui", {
       else this.nowPlayingOpen = false;
     },
     /** Retour arrière (bouton retour d'Android, geste, souris). */
+    /** Confie le bouton retour à un mode plein écran (une entrée d'historique le retient). */
+    holdBack(handler: () => void) {
+      this.overlayBack = handler;
+      push("route");
+    },
+    releaseBack() {
+      this.overlayBack = null;
+    },
     onPopState() {
+      if (this.overlayBack) {
+        // Retour d'Android en mode baladeur : MENU, et l'entrée consommée est remise.
+        this.overlayBack();
+        push("route");
+        return;
+      }
       if (searchExit.leaving) {
         searchExit.leaving = false;
         if (searchExit.revived) {
