@@ -104,6 +104,7 @@ fn read_track_with_folder_cover(path: &Path, folder_has_cover: bool) -> Option<T
     let Some(tagged_file) = read_tagged(path, true).or_else(|| read_tagged(path, false)) else {
         let mut track = track_from_probe(path);
         track.has_cover = folder_has_cover;
+        tidy_video_title(&mut track);
         // Étiquettes illisibles : c'est le lecteur de l'application qui tranche. AAC brut
         // enregistré en « .m4a » (fréquent avec les téléchargeurs) : pas d'étiquettes, mais un
         // son parfaitement lisible. Abîmé seulement si le lecteur n'en tire rien non plus (les
@@ -138,7 +139,7 @@ fn read_track_with_folder_cover(path: &Path, folder_has_cover: bool) -> Option<T
     let embedded_cover = tag.is_some_and(|t| !t.pictures().is_empty());
 
     let artist = artist.unwrap_or_else(|| UNKNOWN_ARTIST.to_string());
-    Some(Track {
+    let mut track = Track {
         id: track_id_for_path(path),
         path: path.to_string_lossy().to_string(),
         title: title.unwrap_or_else(|| file_stem(path)),
@@ -153,7 +154,100 @@ fn read_track_with_folder_cover(path: &Path, folder_has_cover: bool) -> Option<T
         has_cover: embedded_cover || folder_has_cover,
         added_secs: modified_secs(path),
         damage: None,
-    })
+    };
+    tidy_video_title(&mut track);
+    Some(track)
+}
+
+// ---------------------------------------------------------------- titres de vidéos
+
+/// Mots qui, entre parenthèses ou crochets, ne disent rien du morceau (« Official Video »…).
+const VIDEO_NOISE: &[&str] = &[
+    "official", "officiel", "officielle", "lyrics", "lyric", "paroles", "audio", "video", "vidéo", "clip", "visualizer",
+    "visualiser", "4k", "hd", "hq", "8d", "remaster", "remastered", "mv", "explicit", "color coded",
+];
+
+fn same_text(a: &str, b: &str) -> bool {
+    let n = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase();
+    n(a) == n(b)
+}
+
+/// Titre de vidéo sans son bruit : groupes entre parenthèses ou crochets qui ne parlent que de
+/// la vidéo, émojis et symboles, phrase entre guillemets ajoutée à la fin.
+fn strip_video_noise(title: &str) -> String {
+    let mut out = String::new();
+    let mut rest = title;
+    while let Some(start) = rest.find(['(', '[', '【']) {
+        let close = match rest[start..].chars().next() {
+            Some('(') => ')',
+            Some('[') => ']',
+            _ => '】',
+        };
+        out.push_str(&rest[..start]);
+        let after = &rest[start..];
+        match after.find(close) {
+            Some(end) => {
+                let inside = after[after.chars().next().map_or(1, char::len_utf8)..end].to_lowercase();
+                if !VIDEO_NOISE.iter().any(|w| inside.contains(w)) {
+                    out.push_str(&after[..end + close.len_utf8()]);
+                }
+                rest = &after[end + close.len_utf8()..];
+            }
+            None => {
+                out.push_str(after);
+                rest = "";
+            }
+        }
+    }
+    out.push_str(rest);
+    // Phrase entre guillemets en fin de titre (« "I'm in need of…" ») : un extrait, pas le titre.
+    if let Some(q) = out.find(['"', '“', '«']) {
+        if q > 0 {
+            out.truncate(q);
+        }
+    }
+    let kept: String = out
+        .chars()
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace() || "-–—'’&.,!?:+/()[]".contains(*c))
+        .collect();
+    kept.split_whitespace().collect::<Vec<_>>().join(" ").trim_matches(|c: char| c == '-' || c == '–' || c.is_whitespace()).to_string()
+}
+
+/// Morceau tiré d'une vidéo (artiste inconnu, ou artiste et album qui reprennent le titre de la
+/// vidéo) : « Artiste - Titre (Official Video) » devient artiste « Artiste », titre « Titre ».
+/// Les étiquettes propres ne sont jamais touchées.
+pub fn tidy_video_title(track: &mut Track) {
+    let original = track.title.clone();
+    let unknown = track.artist == UNKNOWN_ARTIST || track.artist.trim().is_empty();
+    // L'album seul ne compte pas : pour un single, il porte souvent le nom du morceau.
+    let copied = same_text(&track.artist, &original);
+    if !unknown && !copied {
+        return;
+    }
+    let cleaned = strip_video_noise(&original);
+    if cleaned.is_empty() {
+        return;
+    }
+    let split = [" - ", " – ", " — ", " | "].iter().find_map(|sep| cleaned.split_once(sep));
+    match split {
+        Some((artist, title)) if !artist.trim().is_empty() && !title.trim().is_empty() && artist.chars().count() <= 60 => {
+            track.artist = artist.trim().to_string();
+            track.title = title.trim().to_string();
+        }
+        _ => {
+            track.title = cleaned;
+            if !unknown {
+                // Artiste recopié du titre, sans « Artiste - » à en tirer : inconnu plutôt que faux.
+                track.artist = UNKNOWN_ARTIST.to_string();
+            }
+        }
+    }
+    if same_text(&track.album, &original) {
+        track.album = UNKNOWN_ALBUM.to_string();
+    }
+    if same_text(&track.album_artist, &original) || track.album_artist == UNKNOWN_ARTIST {
+        track.album_artist = track.artist.clone();
+    }
 }
 
 /// Ouvre le flux audio d'un fichier avec symphonia (lecteur de conteneur prêt à donner ses
@@ -541,7 +635,12 @@ pub fn save_cache(file: &Path, root: &str, tracks: &[Track]) -> std::io::Result<
 /// Pistes du dernier scan de `root`, si le cache correspond bien à ce dossier.
 pub fn load_cache(file: &Path, root: &str) -> Option<Vec<Track>> {
     let cache: LibraryCache = serde_json::from_slice(&std::fs::read(file).ok()?).ok()?;
-    (cache.root == root).then_some(cache.tracks)
+    // Bibliothèque déjà analysée : les titres de vidéos sont nettoyés sans nouvelle analyse.
+    (cache.root == root).then(|| {
+        let mut tracks = cache.tracks;
+        tracks.iter_mut().for_each(tidy_video_title);
+        tracks
+    })
 }
 
 // ---------------------------------------------------------------- pochettes
@@ -596,6 +695,60 @@ pub fn embedded_lyrics(path: &Path) -> Option<String> {
         .or_else(|| tag.get_string(ItemKey::UnsyncLyrics))
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+}
+
+#[cfg(test)]
+mod video_title_tests {
+    use super::{tidy_video_title, Track, UNKNOWN_ALBUM, UNKNOWN_ARTIST};
+
+    fn track(title: &str, artist: &str, album: &str) -> Track {
+        Track {
+            id: "t".into(),
+            path: "/x.mp3".into(),
+            title: title.into(),
+            artist: artist.into(),
+            album: album.into(),
+            album_artist: artist.into(),
+            track_no: None,
+            disc_no: None,
+            year: None,
+            genre: None,
+            duration_secs: 180.0,
+            has_cover: false,
+            added_secs: 0,
+            damage: None,
+        }
+    }
+
+    #[test]
+    fn splits_an_untagged_video_title() {
+        let mut t = track("Lomepal - Trop beau (lyrics video)", UNKNOWN_ARTIST, UNKNOWN_ALBUM);
+        tidy_video_title(&mut t);
+        assert_eq!((t.artist.as_str(), t.title.as_str()), ("Lomepal", "Trop beau"));
+        assert_eq!(t.album_artist, "Lomepal");
+    }
+
+    #[test]
+    fn cleans_tags_copied_from_the_video_title() {
+        let raw = "Season 25 - SHOTTA'S (8D Audio) 🎧 \"I'm in need of you\"";
+        let mut t = track(raw, raw, raw);
+        tidy_video_title(&mut t);
+        assert_eq!((t.artist.as_str(), t.title.as_str(), t.album.as_str()), ("Season 25", "SHOTTA'S", UNKNOWN_ALBUM));
+    }
+
+    #[test]
+    fn keeps_versions_and_good_tags() {
+        let mut slowed = track("Shotta's (SLOWED + REVERB) [Official Video]", UNKNOWN_ARTIST, UNKNOWN_ALBUM);
+        tidy_video_title(&mut slowed);
+        assert_eq!(slowed.title, "Shotta's (SLOWED + REVERB)");
+        // Single : l'album porte le nom du morceau, les étiquettes sont bonnes.
+        let mut single = track("Skyfall", "Adele", "Skyfall");
+        tidy_video_title(&mut single);
+        assert_eq!((single.artist.as_str(), single.title.as_str(), single.album.as_str()), ("Adele", "Skyfall", "Skyfall"));
+        let mut tagged = track("Trop beau (Official Video)", "Lomepal", "Jeannine");
+        tidy_video_title(&mut tagged);
+        assert_eq!(tagged.title, "Trop beau (Official Video)", "étiquettes propres jamais touchées");
+    }
 }
 
 #[cfg(test)]
