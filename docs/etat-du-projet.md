@@ -17,13 +17,19 @@ version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
 
 ### Avis des utilisateurs encore ouverts
 
-- **Audiolab** : enregistrements .wav / .m4a illisibles (signalé deux fois). Il faut un
-  fichier exemple ; la capture jointe à l'avis est noire.
+- **Audiolab** : enregistrements .wav / .m4a illisibles (signalé deux fois). Essayé le
+  18/11 avec deux vrais fichiers (WAV PCM 16 bits et AAC de WhatsApp) : lus par le décodeur
+  intégré, sans ffmpeg, donc aussi sur Android. Variantes essayées : WAV 24 bits, 32 bits
+  flottant, ADPCM, 48 kHz stéréo, AAC en .m4a : toutes lues. **Seul trou trouvé** : de l'Opus
+  dans un conteneur MP4 (.m4a). Sur PC, ffmpeg prend le relais ; sur Android, ce fichier
+  reste illisible (`opus::is_ogg_opus` ne reconnaît que l'Ogg). C'est sans doute le cas
+  d'Audiolab (le message parlait d'.opus).
 - **Pochettes des playlists de Méryl** (Android 10, Chrome 114) : correction envoyée, jamais
-  vérifiée sur son téléphone.
-- Les trois demandes sur les playlists (ajout groupé, tri, ajout depuis l'écran de lecture)
-  sont faites en 0.8.0 : **à marquer « Traité »** dans « Avis reçus » une fois la 0.8.0
-  installée.
+  vérifiée sur son téléphone. Les deux autres points de son avis (saisie de la discussion
+  sous le clavier, champ d'avis en pilule) sont corrigés depuis le 11/11.
+- **Tri dans Favoris** : fait dans les playlists (0.8.0), absent de Favoris.
+- **Avancement d'un envoi dans la discussion** : la section Partage montre déjà le
+  pourcentage, les Mo et le temps restant ; la discussion n'affiche que le pourcentage.
 
 ### Vérifications sur de vrais appareils (rien de tout cela n'a été essayé sur téléphone)
 
