@@ -10,6 +10,7 @@ pub mod matching;
 pub mod queue;
 pub mod source;
 pub mod spotdl;
+pub mod spotify_embed;
 pub mod ytdlp;
 
 /// Morceau à télécharger, tel que la personne l'a demandé (import Spotify, sélection…).

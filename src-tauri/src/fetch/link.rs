@@ -1,5 +1,7 @@
-//! Import d'une playlist, d'un album ou d'un morceau Spotify par son lien : spotDL en lit les
-//! métadonnées (`spotdl save`), sans rien télécharger ni demander de clé Spotify.
+//! Import d'une playlist, d'un album ou d'un morceau Spotify par son lien. D'abord la page
+//! « embed » publique de Spotify (`spotify_embed.rs` : partout, téléphones compris, 100
+//! morceaux au plus) ; sur ordinateur, spotDL (`spotdl save`) pour une playlist plus longue ou
+//! si la page ne se lit pas. Jamais de clé Spotify.
 //!
 //! Le texte collé n'est jamais transmis tel quel : le lien est validé, puis reconstruit à partir
 //! du type et de l'identifiant seuls.
@@ -27,7 +29,7 @@ const MAX_TRACKS: usize = 10_000;
 /// spotDL lit les métadonnées morceau par morceau (83 s mesurées pour un seul titre, 12/11) :
 /// une playlist demande bien plus que 2 min.
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(10 * 60);
-const INSTALL_MESSAGE: &str = "Import par lien disponible sur PC avec spotDL installé ; sinon, utilisez l'export de vos données Spotify.";
+const INSTALL_MESSAGE: &str = "Spotify n'a pas pu être lu ; pour une longue playlist, utilisez l'export de vos données Spotify (ou spotDL sur ordinateur).";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LinkTrack {
@@ -41,6 +43,9 @@ pub struct LinkTrack {
 pub struct LinkPlaylist {
     pub name: String,
     pub tracks: Vec<LinkTrack>,
+    /// Liste coupée par Spotify (100 premiers morceaux d'une playlist plus longue).
+    #[serde(default)]
+    pub partial: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -74,9 +79,25 @@ struct SpotdlTrack {
 #[tauri::command(async)]
 pub fn fetch_read_link(app: tauri::AppHandle, url: String) -> Result<LinkPlaylist, String> {
     let link = validate_spotify_link(&url)?;
-    if cfg!(target_os = "android") {
-        return Err(INSTALL_MESSAGE.to_owned());
+    let embed = super::spotify_embed::read(link.kind.segment(), link.id());
+    // Playlist peut-être coupée à 100 : spotDL (ordinateur) lit la liste complète, s'il est là.
+    let maybe_cut = matches!(&embed, Ok(list) if link.kind == Kind::Playlist && list.tracks.len() >= super::spotify_embed::EMBED_LIMIT);
+    if embed.is_ok() && !maybe_cut {
+        return embed.map_err(|error| error.to_string());
     }
+    let full = if cfg!(target_os = "android") { Err(INSTALL_MESSAGE.to_owned()) } else { read_with_spotdl(&app, &link) };
+    match (embed, full) {
+        (_, Ok(list)) => Ok(list),
+        (Ok(mut list), Err(_)) => {
+            list.partial = true;
+            Ok(list)
+        }
+        (Err(error), Err(_)) => Err(error.to_string()),
+    }
+}
+
+/// Lecture complète par spotDL (ordinateur).
+fn read_with_spotdl(app: &tauri::AppHandle, link: &ValidatedLink) -> Result<LinkPlaylist, String> {
     let root = app
         .state::<AppState>()
         .library_root
@@ -88,7 +109,24 @@ pub fn fetch_read_link(app: tauri::AppHandle, url: String) -> Result<LinkPlaylis
         JobError::ToolMissing(_) => INSTALL_MESSAGE.to_owned(),
         other => other.to_string(),
     })?;
-    read_link_with_runner(runner, &link, &Path::new(&root).join(STAGING_DIR), &cancel).map_err(|error| error.to_string())
+    read_link_with_runner(runner, link, &Path::new(&root).join(STAGING_DIR), &cancel).map_err(|error| error.to_string())
+}
+
+impl Kind {
+    fn segment(self) -> &'static str {
+        match self {
+            Kind::Playlist => "playlist",
+            Kind::Album => "album",
+            Kind::Track => "track",
+        }
+    }
+}
+
+impl ValidatedLink {
+    /// Identifiant Spotify (dernier segment du lien reconstruit).
+    fn id(&self) -> &str {
+        self.url.rsplit('/').next().unwrap_or_default()
+    }
 }
 
 /// Accepte `https://open.spotify.com/[intl-xx/]{playlist|album|track}/<22 caractères>` (les
@@ -123,12 +161,7 @@ fn validate_spotify_link(input: &str) -> Result<ValidatedLink, String> {
     if id.len() != 22 || !id.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
         return Err("Ce lien Spotify n'a pas un identifiant valide (22 lettres ou chiffres).".to_owned());
     }
-    let segment = match kind {
-        Kind::Playlist => "playlist",
-        Kind::Album => "album",
-        Kind::Track => "track",
-    };
-    Ok(ValidatedLink { kind, url: format!("https://open.spotify.com/{segment}/{id}") })
+    Ok(ValidatedLink { kind, url: format!("https://open.spotify.com/{}/{id}", kind.segment()) })
 }
 
 /// `intl-fr`, `intl-pt`, `intl-pt-br`…
@@ -238,7 +271,7 @@ fn read_spotdl_file(path: &Path, kind: Kind) -> Result<LinkPlaylist, JobError> {
         Kind::Playlist => None,
     };
     let name = list_name.or(fallback).unwrap_or_else(|| "Playlist Spotify".to_owned());
-    Ok(LinkPlaylist { name, tracks })
+    Ok(LinkPlaylist { name, tracks, partial: false })
 }
 
 #[cfg(test)]

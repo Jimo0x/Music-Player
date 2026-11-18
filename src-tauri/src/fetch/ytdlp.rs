@@ -1,5 +1,8 @@
-//! Adaptateur yt-dlp. Les recherches se font avec une seule entrée `ytsearch1:` ; les fichiers
-//! sont d'abord créés dans un dossier isolé, puis repris et renommés avec un nom sûr.
+//! Adaptateur yt-dlp. Une recherche se fait à la façon de spotDL : yt-dlp liste 5 candidats
+//! sans rien télécharger (`ytsearch5:`), notre correspondance (titre, artiste, durée, version)
+//! choisit le meilleur, puis yt-dlp télécharge celui-là par son lien. Un lien direct est
+//! téléchargé tel quel. Les fichiers sont d'abord créés dans un dossier isolé, puis repris et
+//! renommés avec un nom sûr.
 //!
 //! Le dossier est donné à part (`-P`) et le modèle de nom reste relatif (`-o`) : yt-dlp lit tout
 //! `%` du modèle comme une variable, et un dossier de bibliothèque peut en contenir un.
@@ -56,7 +59,12 @@ impl Source for YtDlpSource {
             return Err(JobError::Cancelled);
         }
         let runner = resolve_runner(cancel)?;
-        let query = make_query(wanted)?;
+        let query = if wanted.url.is_some() {
+            make_query(wanted)?
+        } else {
+            let candidates = search_candidates(&runner, &make_query(wanted)?, cancel)?;
+            pick_candidate(wanted, &candidates).ok_or(JobError::NotFound)?.url.clone()
+        };
         let attempt_dir = create_attempt_directory(dest_dir)?;
         let file_name = requested_file_name(wanted);
 
@@ -102,7 +110,76 @@ fn resolve_runner(cancel: &AtomicBool) -> Result<Runner, JobError> {
     Err(JobError::ToolMissing(truncate_log(&detail)))
 }
 
-/// Une seule recherche YouTube, le meilleur résultat (`ytsearch1:`).
+/// Résultat de recherche YouTube, avant tout téléchargement.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct Candidate {
+    pub title: String,
+    pub artist: String,
+    pub duration_secs: Option<f64>,
+    pub url: String,
+}
+
+/// Candidats lus dans la réponse de `--flat-playlist --dump-single-json` : seuls les liens
+/// YouTube sont gardés (ils sont ensuite passés tels quels à yt-dlp).
+pub(super) fn parse_candidates(json: &str) -> Vec<Candidate> {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else { return Vec::new() };
+    let text = |e: &serde_json::Value, key: &str| e.get(key).and_then(|v| v.as_str()).map(str::trim).unwrap_or_default().to_owned();
+    value
+        .get("entries")
+        .and_then(|v| v.as_array())
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(|e| {
+                    let url = text(e, "url");
+                    let youtube = url.starts_with("https://www.youtube.com/watch?v=") || url.starts_with("https://music.youtube.com/watch?v=");
+                    let channel = if text(e, "channel").is_empty() { text(e, "uploader") } else { text(e, "channel") };
+                    (youtube && !url.chars().any(char::is_whitespace)).then(|| Candidate {
+                        title: text(e, "title"),
+                        artist: channel.trim_end_matches(" - Topic").to_owned(),
+                        duration_secs: e.get("duration").and_then(|v| v.as_f64()),
+                        url,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Le candidat qui correspond le mieux (titre, artiste, durée, même version), s'il y en a un.
+pub(super) fn pick_candidate<'a>(wanted: &Wanted, candidates: &'a [Candidate]) -> Option<&'a Candidate> {
+    use super::matching::{score_match, TrackInfo};
+    let asked = TrackInfo { title: &wanted.title, artist: &wanted.artist, duration_secs: wanted.duration_secs };
+    candidates
+        .iter()
+        .map(|c| (c, score_match(asked, TrackInfo { title: &c.title, artist: &c.artist, duration_secs: c.duration_secs })))
+        .filter(|(_, score)| score.accepted)
+        .fold(None::<(&Candidate, f64)>, |best, (c, score)| match best {
+            Some((_, total)) if total >= score.total => best,
+            _ => Some((c, score.total)),
+        })
+        .map(|(c, _)| c)
+}
+
+/// Candidats d'une recherche, sans téléchargement.
+fn search_candidates(runner: &Runner, search: &str, cancel: &AtomicBool) -> Result<Vec<Candidate>, JobError> {
+    let mut command = runner.command();
+    command
+        .arg("--ignore-config")
+        .arg("--flat-playlist")
+        .arg("--dump-single-json")
+        .arg("--no-warnings")
+        .arg("--")
+        .arg(search);
+    match run_command(&mut command, PROBE_TIMEOUT * 6, cancel)? {
+        Bounded::Finished { status, stdout, .. } if status.success() => Ok(parse_candidates(&stdout)),
+        Bounded::Finished { stdout, stderr, .. } => Err(classify_failure(&stdout, &stderr)),
+        Bounded::TimedOut { .. } => Err(JobError::Timeout),
+        Bounded::Cancelled { .. } => Err(JobError::Cancelled),
+    }
+}
+
+/// Recherche YouTube de 5 candidats (`ytsearch5:`), ou le lien direct demandé.
 fn make_query(wanted: &Wanted) -> Result<String, JobError> {
     // Lien direct : passé tel quel (après « -- », il ne peut pas être pris pour une option).
     if wanted.url.is_some() {
@@ -111,7 +188,7 @@ fn make_query(wanted: &Wanted) -> Result<String, JobError> {
             .map(str::to_owned)
             .ok_or_else(|| JobError::Failed("Ce lien n'est pas une adresse web valable (http ou https).".to_owned()));
     }
-    super::spotdl::make_query(wanted).map(|search| format!("ytsearch1:{search}"))
+    super::spotdl::make_query(wanted).map(|search| format!("ytsearch5:{search}"))
 }
 
 fn run_download(runner: Runner, query: &str, attempt_dir: &Path, cancel: &AtomicBool) -> Result<Bounded, JobError> {
@@ -219,7 +296,7 @@ mod tests {
     }
     use std::sync::atomic::AtomicBool;
 
-    use super::{classify_failure, make_query, YtDlpSource, OUTPUT_TEMPLATE};
+    use super::{classify_failure, make_query, parse_candidates, pick_candidate, YtDlpSource, OUTPUT_TEMPLATE};
     use crate::fetch::source::Source;
     use crate::fetch::{JobError, Wanted};
 
@@ -228,8 +305,28 @@ mod tests {
     }
 
     #[test]
-    fn recherche_un_seul_resultat_et_garde_la_recherche_en_argument_unique() {
-        assert_eq!(make_query(&wanted("Titre --help", "Artiste")).expect("recherche"), "ytsearch1:Artiste - Titre --help");
+    fn recherche_cinq_candidats_et_garde_la_recherche_en_argument_unique() {
+        assert_eq!(make_query(&wanted("Titre --help", "Artiste")).expect("recherche"), "ytsearch5:Artiste - Titre --help");
+    }
+
+    #[test]
+    fn choisit_le_candidat_qui_correspond_comme_spotdl() {
+        // Réponse réelle de yt-dlp (18/11), raccourcie : la vidéo officielle a une intro (263 s),
+        // la version audio a la durée de Spotify (200 s).
+        let json = r#"{"entries":[
+            {"title":"The Weeknd - Blinding Lights (Official Video)","channel":"The Weeknd","duration":263,"url":"https://www.youtube.com/watch?v=4NRXx6U8ABQ"},
+            {"title":"The Weeknd - Blinding Lights (Official Audio)","channel":"The Weeknd","duration":204,"url":"https://www.youtube.com/watch?v=fHI8X4OXluQ"},
+            {"title":"The Weeknd - Blinding Lights (Lyrics)","channel":"7clouds Indie","duration":201,"url":"https://www.youtube.com/watch?v=BwX8OS4cegU"},
+            {"title":"The Weeknd - Blinding Lights (Live On The 2020 MTV VMAs)","channel":"The Weeknd","duration":199,"url":"https://www.youtube.com/watch?v=ewfdRy5jfF8"},
+            {"title":"Ailleurs","channel":"X","duration":200,"url":"file:///etc/passwd"}]}"#;
+        let candidates = parse_candidates(json);
+        assert_eq!(candidates.len(), 4, "le lien qui n'est pas YouTube est écarté");
+        let mut w = wanted("Blinding Lights", "The Weeknd");
+        w.duration_secs = Some(200.0);
+        assert_eq!(pick_candidate(&w, &candidates).map(|c| c.url.as_str()), Some("https://www.youtube.com/watch?v=fHI8X4OXluQ"));
+        // Rien qui corresponde : rien n'est choisi (et rien n'est téléchargé).
+        let other = wanted("Save Your Tears", "The Weeknd");
+        assert!(pick_candidate(&other, &candidates).is_none());
     }
 
     #[test]

@@ -258,4 +258,6 @@ export interface FetchJobUpdate {
 export interface LinkPlaylist {
   name: string;
   tracks: { title: string; artist: string; album: string; duration_secs: number | null }[];
+  /** Liste coupée par Spotify (100 premiers morceaux d'une longue playlist). */
+  partial?: boolean;
 }
