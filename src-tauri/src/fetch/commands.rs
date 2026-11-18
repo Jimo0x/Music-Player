@@ -144,6 +144,36 @@ pub fn start_worker(app: tauri::AppHandle, runtime: Arc<FetchRuntime>) {
 }
 
 fn worker_loop(app: tauri::AppHandle, runtime: Arc<FetchRuntime>) {
+    drain_queue(
+        &runtime,
+        |id, wanted, cancel| crate::fetch::common::with_progress(progress_events(&app, id), || run_job(&app, wanted, cancel)),
+        |wanted, track| add_imported_track(&app, wanted, track),
+        |notice| match notice {
+            Notice::Job(id) => emit_job(&app, &runtime, id),
+            Notice::Queue => emit_queue(&app, &runtime),
+            Notice::Error(message) => {
+                let _ = app.emit("fetch-error", message);
+            }
+        },
+    );
+}
+
+/// Ce que la boucle annonce à l'interface.
+enum Notice<'a> {
+    Job(&'a str),
+    Queue,
+    Error(String),
+}
+
+/// Traite la file jusqu'à ce qu'elle soit vide : prend la tâche suivante, la lance (`run`),
+/// range le morceau obtenu (`import`), enregistre l'issue et prévient (`notify`). Séparée de
+/// Tauri pour être testée avec de faux outils. Jamais deux verrous tenus en même temps.
+fn drain_queue(
+    runtime: &FetchRuntime,
+    run: impl Fn(&str, &Wanted, &AtomicBool) -> Result<Track, JobError>,
+    import: impl Fn(&Wanted, Track) -> Result<(), String>,
+    notify: impl Fn(Notice<'_>),
+) {
     loop {
         let next = {
             let mut queue = runtime.queue.locked();
@@ -156,7 +186,7 @@ fn worker_loop(app: tauri::AppHandle, runtime: Arc<FetchRuntime>) {
             if let Err(error) = queue.set_state(&id, JobState::Running, None) {
                 runtime.worker_running.store(false, Ordering::Release);
                 drop(queue);
-                let _ = app.emit("fetch-error", format!("Impossible de démarrer la tâche : {error}"));
+                notify(Notice::Error(format!("Impossible de démarrer la tâche : {error}")));
                 return;
             }
             (id, wanted)
@@ -164,13 +194,11 @@ fn worker_loop(app: tauri::AppHandle, runtime: Arc<FetchRuntime>) {
         let (id, wanted) = next;
         let cancel = Arc::new(AtomicBool::new(false));
         runtime.cancellations.locked().insert(id.clone(), Arc::clone(&cancel));
-        emit_job(&app, &runtime, &id);
-        emit_queue(&app, &runtime);
+        notify(Notice::Job(&id));
+        notify(Notice::Queue);
 
-        let sink = progress_events(&app, &id);
-        let outcome = crate::fetch::common::with_progress(sink, || run_job(&app, &wanted, &cancel));
-        let (state, error) = match outcome {
-            Ok(track) => match add_imported_track(&app, &wanted, track) {
+        let (state, error) = match run(&id, &wanted, &cancel) {
+            Ok(track) => match import(&wanted, track) {
                 Ok(()) => (JobState::Done, None),
                 Err(detail) => (JobState::Failed, Some(detail)),
             },
@@ -181,10 +209,10 @@ fn worker_loop(app: tauri::AppHandle, runtime: Arc<FetchRuntime>) {
         runtime.cancellations.locked().remove(&id);
         let saved = runtime.queue.locked().set_state(&id, state, error);
         if let Err(save_error) = saved {
-            let _ = app.emit("fetch-error", format!("Impossible d'enregistrer l'état de la tâche : {save_error}"));
+            notify(Notice::Error(format!("Impossible d'enregistrer l'état de la tâche : {save_error}")));
         }
-        emit_job(&app, &runtime, &id);
-        emit_queue(&app, &runtime);
+        notify(Notice::Job(&id));
+        notify(Notice::Queue);
     }
 }
 
@@ -241,4 +269,102 @@ fn emit_job(app: &tauri::AppHandle, runtime: &FetchRuntime, id: &str) {
 
 fn emit_queue(app: &tauri::AppHandle, runtime: &FetchRuntime) {
     let _ = app.emit(QUEUE_EVENT, runtime.queue.locked().items());
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Mutex;
+
+    use super::{drain_queue, FetchRuntime, Notice};
+    use crate::fetch::{JobError, JobState, Wanted};
+    use crate::library::Track;
+    use crate::state::Locked;
+
+    fn wanted(title: &str) -> Wanted {
+        Wanted { title: title.into(), artist: "Artiste".into(), album: String::new(), duration_secs: None, playlist_id: None }
+    }
+
+    fn track(title: &str) -> Track {
+        Track {
+            id: format!("id-{title}"),
+            path: format!("/x/{title}.mp3"),
+            title: title.into(),
+            artist: "Artiste".into(),
+            album: String::new(),
+            album_artist: "Artiste".into(),
+            track_no: None,
+            disc_no: None,
+            year: None,
+            genre: None,
+            duration_secs: 1.0,
+            has_cover: false,
+            added_secs: 0,
+            damage: None,
+        }
+    }
+
+    #[test]
+    fn the_queue_is_worked_through_and_each_outcome_is_saved() {
+        let dir = tempfile::tempdir().unwrap();
+        let (runtime, problem) = FetchRuntime::open(dir.path());
+        assert!(problem.is_none());
+        let titles = ["Trouvé", "Introuvable", "Arrêté", "Rangement raté"];
+        runtime.queue.locked().enqueue_many(titles.iter().map(|t| wanted(t)).collect()).unwrap();
+        runtime.worker_running.store(true, Ordering::Release);
+
+        let imported = Mutex::new(Vec::new());
+        let notices = Mutex::new(Vec::new());
+        let during_run_cancellable = AtomicBool::new(false);
+        drain_queue(
+            &runtime,
+            |id, wanted, _| {
+                // Pendant le travail, la tâche peut être arrêtée (drapeau enregistré).
+                if runtime.cancellations.locked().contains_key(id) {
+                    during_run_cancellable.store(true, Ordering::Relaxed);
+                }
+                match wanted.title.as_str() {
+                    "Introuvable" => Err(JobError::NotFound),
+                    "Arrêté" => Err(JobError::Cancelled),
+                    other => Ok(track(other)),
+                }
+            },
+            |wanted, track| {
+                if wanted.title == "Rangement raté" {
+                    return Err("Playlist introuvable.".into());
+                }
+                imported.lock().unwrap().push(track.title);
+                Ok(())
+            },
+            |notice| {
+                notices.lock().unwrap().push(match notice {
+                    Notice::Job(_) => "tâche",
+                    Notice::Queue => "file",
+                    Notice::Error(_) => "erreur",
+                })
+            },
+        );
+
+        let queue = runtime.queue.locked();
+        let state = |title: &str| queue.items().iter().find(|i| i.wanted.title == title).map(|i| (i.state, i.last_error.clone()));
+        assert_eq!(state("Trouvé"), Some((JobState::Done, None)));
+        assert!(matches!(state("Introuvable"), Some((JobState::Failed, Some(_)))));
+        assert!(matches!(state("Arrêté"), Some((JobState::Cancelled, Some(_)))));
+        assert_eq!(state("Rangement raté"), Some((JobState::Failed, Some("Playlist introuvable.".into()))));
+        assert_eq!(*imported.lock().unwrap(), vec!["Trouvé".to_string()]);
+        assert!(during_run_cancellable.load(Ordering::Relaxed));
+        assert!(runtime.cancellations.locked().is_empty(), "drapeaux d'arrêt retirés");
+        assert!(!runtime.worker_running.load(Ordering::Acquire), "fil arrêté, file vide");
+        // Chaque tâche : départ puis fin, chacun annoncé à l'interface (tâche + file).
+        assert_eq!(notices.lock().unwrap().len(), titles.len() * 4);
+    }
+
+    #[test]
+    fn an_empty_queue_stops_at_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let (runtime, _) = FetchRuntime::open(dir.path());
+        runtime.worker_running.store(true, Ordering::Release);
+        drain_queue(&runtime, |_, _, _| unreachable!("rien à lancer"), |_, _| Ok(()), |_| {});
+        assert!(!runtime.worker_running.load(Ordering::Acquire));
+    }
 }
