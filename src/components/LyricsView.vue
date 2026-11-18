@@ -397,7 +397,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0 0 14px;
   font-size: 12px;
   color: var(--text-3);
@@ -425,7 +425,7 @@ onBeforeUnmount(() => {
   z-index: 2;
   padding: 8px 18px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.92);
   color: #0a1030;
   font-size: 13px;
@@ -448,7 +448,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-content: center;
   justify-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 24px;
   text-align: center;
   color: var(--text-2);
@@ -460,7 +460,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   margin-top: 8px;
 }
 .pill.small {
@@ -524,7 +524,7 @@ onBeforeUnmount(() => {
 .offset {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
-  gap: 4px;
+  gap: var(--space-1);
   margin: 0 4px 6px;
 }
 .offset button {
@@ -545,7 +545,7 @@ onBeforeUnmount(() => {
 .tools-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
   padding: 9px 10px;
   border: 0;

@@ -166,7 +166,7 @@ function share() {
   max-height: calc(100vh - 16px);
   overflow: auto;
   padding: 5px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(var(--surface-rgb), 0.95);
   backdrop-filter: blur(24px) saturate(1.6);
   box-shadow: var(--shadow), inset 0 0 0 0.5px rgba(var(--fg-rgb), 0.12);
@@ -192,7 +192,7 @@ button {
   width: 100%;
   padding: 6px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: none;
   text-align: left;
   font-size: 13px;

@@ -192,7 +192,7 @@ h2 {
 }
 .code-form {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   margin-bottom: 6px;
 }
 .code-input {
@@ -201,7 +201,7 @@ h2 {
   height: 40px;
   padding: 0 12px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(var(--fg-rgb), 0.08);
   font-size: 16px;
   font-weight: 600;
@@ -216,7 +216,7 @@ h2 {
   z-index: 70;
   width: min(340px, calc(100vw - 32px));
   padding: 4px 12px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: rgba(var(--surface-rgb), 0.96);
   box-shadow: var(--shadow), inset 0 0 0 0.5px rgba(var(--fg-rgb), 0.12);
   backdrop-filter: blur(20px);

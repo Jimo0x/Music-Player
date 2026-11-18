@@ -258,7 +258,7 @@ const backLabel = "Artistes";
 .index-head {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 .index-head .page-title {
@@ -275,7 +275,7 @@ const backLabel = "Artistes";
 .letters {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-1);
   margin: 16px 0 4px;
 }
 .letters button {
@@ -283,7 +283,7 @@ const backLabel = "Artistes";
   height: 30px;
   padding: 0 8px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(var(--fg-rgb), 0.06);
   color: var(--text-2);
   font: inherit;
@@ -323,7 +323,7 @@ const backLabel = "Artistes";
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
   justify-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
   padding: 0;
   border: 0;
@@ -361,7 +361,7 @@ const backLabel = "Artistes";
   margin-bottom: 14px;
   padding: 6px 10px 6px 6px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   color: var(--text-2);
   font: inherit;
@@ -375,7 +375,7 @@ const backLabel = "Artistes";
 .hero {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: var(--space-6);
   padding: 24px;
   border-radius: 22px;
   background: linear-gradient(135deg, rgba(var(--fg-rgb), 0.07), rgba(var(--fg-rgb), 0.02));
@@ -439,7 +439,7 @@ const backLabel = "Artistes";
 }
 .view-toggle {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
 }
 .view-toggle button {
   display: grid;
@@ -472,11 +472,11 @@ const backLabel = "Artistes";
 .top-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   padding: 8px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: none;
   color: var(--text);
   font: inherit;
@@ -549,7 +549,7 @@ const backLabel = "Artistes";
   .hero {
     flex-direction: column;
     text-align: center;
-    gap: 16px;
+    gap: var(--space-4);
     padding: 20px 16px;
   }
   .hero-art {

@@ -184,7 +184,7 @@ h1 {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 16px;
+    gap: var(--space-4);
   }
   .hero .actions {
     justify-content: center;

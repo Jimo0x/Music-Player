@@ -286,7 +286,7 @@ function history(d: DeviceInventory): CopyRequest[] {
 }
 .confirm-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .link.danger {
   color: #ff8a8a;
@@ -319,7 +319,7 @@ function history(d: DeviceInventory): CopyRequest[] {
 .device header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .device-icon {
   display: grid;
@@ -341,19 +341,19 @@ function history(d: DeviceInventory): CopyRequest[] {
 }
 .device {
   display: grid;
-  gap: 16px;
+  gap: var(--space-4);
 }
 .tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
 }
 .tile {
   display: grid;
   align-content: start;
-  gap: 4px;
+  gap: var(--space-1);
   padding: 14px 16px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--bg-hover);
 }
 .big {
@@ -368,7 +368,7 @@ function history(d: DeviceInventory): CopyRequest[] {
 .tile-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: 10px;
 }
 .small {
@@ -377,7 +377,7 @@ function history(d: DeviceInventory): CopyRequest[] {
 }
 .progress {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
@@ -385,7 +385,7 @@ function history(d: DeviceInventory): CopyRequest[] {
 .progress-text {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: 13.5px;
 }
 .progress-text span {
@@ -419,7 +419,7 @@ function history(d: DeviceInventory): CopyRequest[] {
 }
 .history {
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -461,7 +461,7 @@ function history(d: DeviceInventory): CopyRequest[] {
 .picker-foot {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .picker-head .fieldbox {
   flex: 1;
@@ -490,7 +490,7 @@ function history(d: DeviceInventory): CopyRequest[] {
 .tracks label {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 9px 14px;
   min-height: 44px;
   cursor: pointer;

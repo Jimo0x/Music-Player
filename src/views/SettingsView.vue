@@ -354,7 +354,7 @@ const shortcuts = [
 .feedback-card {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   margin: 0 0 var(--space-4);
   padding: 12px 14px;
@@ -414,7 +414,7 @@ const shortcuts = [
   height: 28px;
   padding: 0 12px;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--bg-active);
   font-size: 12.5px;
 }
@@ -431,7 +431,7 @@ const shortcuts = [
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: 12px;
   color: var(--text-2);
 }

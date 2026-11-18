@@ -438,7 +438,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   margin: 26px 0 14px;
 }
 .meta-text {
@@ -488,7 +488,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
   left: calc(var(--safe-left) + 58px);
   z-index: 2;
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
 }
 .view-tools .icon-btn {
   width: 36px;
@@ -560,12 +560,12 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
 .up-next {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
   margin-top: 12px;
   padding: 8px 12px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.82);
   font-size: 13px;
@@ -665,7 +665,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
     grid-row: 1;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
     width: 100%;
     margin: 0 0 10px;
     padding: 0;

@@ -368,7 +368,7 @@ const resultLabel = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 18px 20px 10px;
 }
 .heading {
@@ -393,11 +393,11 @@ h2 {
 .search {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0 20px;
   padding: 0 12px;
   height: 42px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(var(--fg-rgb), 0.08);
   color: var(--text-2);
 }
@@ -435,7 +435,7 @@ h2 {
 }
 .tabs {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   padding: 3px;
   border-radius: 9px;
   background: rgba(var(--fg-rgb), 0.06);
@@ -491,7 +491,7 @@ h2 {
 .item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   height: 100%;
   padding: 0 10px;
   border-radius: 9px;
@@ -598,7 +598,7 @@ h2 {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   height: 32px;
   padding: 0 12px;
   border: 0;
@@ -620,7 +620,7 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 12px 20px;
   border-top: 1px solid var(--separator);
   background: rgba(var(--bar-rgb), 0.6);
@@ -647,7 +647,7 @@ h2 {
 }
 .foot-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   flex: none;
 }
 .pill:disabled {

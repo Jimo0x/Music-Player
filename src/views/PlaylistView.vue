@@ -157,7 +157,7 @@ function share() {
   flex: none;
   padding: 0;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   overflow: hidden;
   background: none;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
@@ -199,7 +199,7 @@ h1 {
   width: 100%;
   padding: 0 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-active);
   outline: 2px solid var(--accent);
 }
@@ -230,7 +230,7 @@ h1 {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 16px;
+    gap: var(--space-4);
   }
   .hero .actions {
     justify-content: center;

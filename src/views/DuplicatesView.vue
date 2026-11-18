@@ -155,7 +155,7 @@ async function removeAll() {
 .empty {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   color: var(--text-2);
 }
 .summary {
@@ -177,7 +177,7 @@ async function removeAll() {
 }
 .summary-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .group {
   margin-bottom: 14px;
@@ -193,13 +193,13 @@ async function removeAll() {
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
   margin-bottom: 8px;
 }
 .name {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
 }
 .skip {
@@ -254,7 +254,7 @@ async function removeAll() {
 .best {
   margin-left: 6px;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--success-soft);
   color: var(--success);
   font-size: 11px;

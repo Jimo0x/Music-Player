@@ -209,7 +209,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey, { capture: tr
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 18px 20px 10px;
 }
 .heading {
@@ -234,11 +234,11 @@ h2 {
 .search {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0 20px;
   padding: 0 6px 0 12px;
   height: 44px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(var(--fg-rgb), 0.08);
   color: var(--text-2);
 }
@@ -298,11 +298,11 @@ h2 {
 .item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   padding: 10px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: none;
   text-align: left;
   -webkit-tap-highlight-color: transparent;
@@ -348,11 +348,11 @@ h2 {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  gap: var(--space-1);
 }
 .badge {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 11px;
   font-weight: 600;
 }
@@ -381,7 +381,7 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 12px 20px;
   border-top: 1px solid var(--separator);
   font-size: 12px;

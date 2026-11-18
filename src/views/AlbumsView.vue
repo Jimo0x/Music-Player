@@ -55,7 +55,7 @@ const ui = useUiStore();
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
 }
 .sorts {
   display: flex;
@@ -68,7 +68,7 @@ const ui = useUiStore();
   height: 26px;
   padding: 0 11px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--text-2);
   font-size: 12.5px;

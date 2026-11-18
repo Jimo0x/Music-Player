@@ -186,7 +186,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : 
 .tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   margin: -4px 0 22px;
 }
 .tabs button {
@@ -196,7 +196,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : 
   height: 34px;
   padding: 0 14px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(var(--fg-rgb), 0.07);
   color: var(--text-2);
   font: inherit;
@@ -236,7 +236,7 @@ h2 {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .see-all {
   border: 0;
@@ -287,13 +287,13 @@ h2 {
 .best-sub {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: 13.5px;
   color: var(--text-2);
 }
 .badge {
   padding: 2px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(var(--fg-rgb), 0.1);
   color: var(--text);
   font-size: 11.5px;
@@ -385,7 +385,7 @@ h2 {
 .person {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   padding: 8px;
   border: 0;

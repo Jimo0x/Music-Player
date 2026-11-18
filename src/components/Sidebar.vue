@@ -329,7 +329,7 @@ function newPlaylist() {
 .foot-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 .foot-row .nav-item {
   flex: 1;
@@ -356,7 +356,7 @@ function newPlaylist() {
 .scan {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 4px 10px;
   font-size: 12px;
   color: var(--text-2);

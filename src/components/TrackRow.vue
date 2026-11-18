@@ -98,10 +98,10 @@ async function toggleLike() {
   display: grid;
   grid-template-columns: 44px minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 56px 28px 32px;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   height: 100%;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text);
   outline: none;
 }
@@ -205,7 +205,7 @@ async function toggleLike() {
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--accent);
   opacity: 0;
@@ -220,7 +220,7 @@ async function toggleLike() {
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--text-3);
   opacity: 0;

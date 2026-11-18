@@ -412,7 +412,7 @@ async function saveCard() {
   left: 16px;
   right: 16px;
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   z-index: 3;
 }
 .bars span {
@@ -521,9 +521,9 @@ async function saveCard() {
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 12px 20px;
   background: #fff;
   color: #111;
@@ -531,7 +531,7 @@ async function saveCard() {
 }
 .ghost {
   border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 11px 18px;
   background: none;
   color: #fff;
@@ -542,7 +542,7 @@ async function saveCard() {
   width: min(62vw, 300px, 34vh);
   aspect-ratio: 1;
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
 }
 .cover.round {
   border-radius: 50%;
@@ -577,7 +577,7 @@ async function saveCard() {
   height: 56px;
   flex: none;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 .mini.round {
@@ -606,7 +606,7 @@ async function saveCard() {
 .clock {
   display: flex;
   align-items: flex-end;
-  gap: 4px;
+  gap: var(--space-1);
   height: 160px;
   margin-top: 10px;
 }
@@ -625,14 +625,14 @@ async function saveCard() {
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 .chips li {
   padding: 8px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.18);
   font-weight: 700;
 }
@@ -648,7 +648,7 @@ async function saveCard() {
 }
 .card-head {
   display: flex;
-  gap: 16px;
+  gap: var(--space-4);
   align-items: center;
 }
 .card-cover {
@@ -675,7 +675,7 @@ async function saveCard() {
   display: grid;
   /* minmax(0, …) : un nom long est coupé par « … » au lieu d'élargir la colonne hors du cadre. */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+  gap: var(--space-4);
 }
 .card-label {
   margin: 0 0 6px;
@@ -731,7 +731,7 @@ async function saveCard() {
   transform: translateX(-50%);
   margin: 0;
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(0, 0, 0, 0.35);
   font-size: 13px;
   font-weight: 700;

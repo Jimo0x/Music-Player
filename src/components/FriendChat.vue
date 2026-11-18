@@ -442,7 +442,7 @@ header {
 }
 .day span {
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(var(--fg-rgb), 0.07);
   color: var(--text-2);
   font-size: 11.5px;
@@ -617,7 +617,7 @@ header {
   height: 32px;
   padding: 0 14px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--on-accent);
   font: inherit;
@@ -692,7 +692,7 @@ footer {
   gap: 10px;
   margin-bottom: 8px;
   padding: 6px 6px 6px 8px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: rgba(var(--fg-rgb), 0.06);
   border-left: 3px solid var(--accent);
 }
@@ -702,7 +702,7 @@ footer {
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   color: var(--accent);
 }
@@ -726,7 +726,7 @@ footer {
 }
 .sending {
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
   margin-bottom: 8px;
   font-size: 12px;
   color: var(--accent);
@@ -750,7 +750,7 @@ footer {
   right: 8px;
   bottom: calc(100% + 6px);
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
   max-height: min(60vh, 440px);
   padding: 10px;
   border-radius: 18px;
@@ -772,7 +772,7 @@ footer {
   width: 100%;
   padding: 6px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: none;
   color: var(--text);
   font: inherit;
@@ -788,7 +788,7 @@ footer {
   flex: none;
   width: 40px;
   height: 40px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 .option-text {
@@ -836,7 +836,7 @@ footer {
   height: 32px;
   padding: 0 12px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(var(--fg-rgb), 0.08);
   color: var(--text);
   font: inherit;

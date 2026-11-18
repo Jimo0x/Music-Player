@@ -152,7 +152,7 @@ function play(index: number) {
   z-index: 2;
   display: grid;
   grid-template-columns: 44px minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 56px 32px;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 8px 10px;
   background: var(--bg-content);
   border-bottom: 1px solid var(--separator);

@@ -86,7 +86,7 @@ const storyRecap = computed(() => (story.value ? buildRecap(listening.music, sto
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
   margin-bottom: 22px;
   padding: 20px 22px;
   border-radius: 18px;
@@ -135,11 +135,11 @@ const storyRecap = computed(() => (story.value ? buildRecap(listening.music, sto
 .buttons {
   position: relative;
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .go {
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 10px 18px;
   background: #fff;
   color: #2a1250;
@@ -147,7 +147,7 @@ const storyRecap = computed(() => (story.value ? buildRecap(listening.music, sto
 }
 .later {
   border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 10px 14px;
   background: none;
   color: #fff;
@@ -156,11 +156,11 @@ const storyRecap = computed(() => (story.value ? buildRecap(listening.music, sto
 .shortcut {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin-bottom: 18px;
   padding: 8px 14px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(var(--fg-rgb), 0.07);
   color: inherit;
   font-size: 13px;

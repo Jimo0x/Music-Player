@@ -578,7 +578,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 7px 16px;
   font-size: 12.5px;
 }
@@ -608,7 +608,7 @@ onBeforeUnmount(() => {
   bottom: calc(84px + var(--safe-bottom));
   z-index: 45;
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
   pointer-events: none;
 }
 .app.mobile.has-track .notices {
@@ -680,7 +680,7 @@ onBeforeUnmount(() => {
   z-index: 70;
   transform: translateX(-50%);
   padding: 9px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(var(--surface-rgb), 0.95);
   backdrop-filter: blur(20px);
   box-shadow: var(--shadow);

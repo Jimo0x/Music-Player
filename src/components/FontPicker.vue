@@ -160,13 +160,13 @@ async function remove(id: string) {
 }
 .bar {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .search {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   height: 36px;
   padding: 0 10px;
   border-radius: 9px;
@@ -217,7 +217,7 @@ async function remove(id: string) {
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 8px;
+  gap: var(--space-2);
   max-height: 340px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -232,10 +232,10 @@ async function remove(id: string) {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   min-width: 0;
   padding: 12px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(var(--fg-rgb), 0.05);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -269,7 +269,7 @@ async function remove(id: string) {
 .tag {
   flex: none;
   padding: 0 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(var(--fg-rgb), 0.08);
   font-style: normal;
   font-size: 10.5px;

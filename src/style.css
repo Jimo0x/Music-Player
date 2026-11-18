@@ -131,7 +131,7 @@ select {
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   height: 34px;
   padding: 0 18px;
   border: 0;
@@ -237,7 +237,7 @@ select {
 .section-card > h2 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0 0 12px;
   font-size: 15px;
 }
@@ -425,7 +425,7 @@ select {
 
 /* Champs de saisie (barres de recherche, noms…, marqués « fieldbox ») : forme et style. */
 :root[data-field-shape="pill"] .fieldbox {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 /* Zone de texte sur plusieurs lignes : une pilule en couperait le début et la fin des lignes
    (avis de Méryl). Coins simplement arrondis. Sans :has(), que les vues web anciennes ignorent. */

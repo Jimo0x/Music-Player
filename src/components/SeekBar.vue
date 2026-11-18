@@ -138,7 +138,7 @@ const bubble = computed(() => {
   position: absolute;
   bottom: calc(100% + 8px);
   padding: 3px 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transform: translateX(-50%);
   font-size: 11px;
   font-variant-numeric: tabular-nums;

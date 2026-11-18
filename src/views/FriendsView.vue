@@ -371,7 +371,7 @@ function relation(code: string): "ami" | "attente" | null {
 .discussion {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   padding: 10px 6px;
   border: 0;
@@ -394,7 +394,7 @@ function relation(code: string): "ami" | "attente" | null {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .d-top strong {
   overflow: hidden;
@@ -422,7 +422,7 @@ function relation(code: string): "ami" | "attente" | null {
   flex: none;
   min-width: 20px;
   padding: 0 6px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--accent);
   color: var(--on-accent);
   font-size: 12px;
@@ -449,7 +449,7 @@ function relation(code: string): "ami" | "attente" | null {
 }
 .card {
   padding: 18px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: rgba(var(--fg-rgb), 0.05);
 }
 .intro {
@@ -480,7 +480,7 @@ function relation(code: string): "ami" | "attente" | null {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .label {
   margin: 0;
@@ -513,9 +513,9 @@ function relation(code: string): "ami" | "attente" | null {
 .person {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 10px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 .person + .person {
   border-top: 1px solid var(--separator);
@@ -581,7 +581,7 @@ function relation(code: string): "ami" | "attente" | null {
 }
 .search {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   max-width: 480px;
 }
 .search input {
@@ -589,7 +589,7 @@ function relation(code: string): "ami" | "attente" | null {
   min-width: 0;
   height: 36px;
   padding: 0 12px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 14px;
   letter-spacing: 0.04em;
   text-transform: uppercase;

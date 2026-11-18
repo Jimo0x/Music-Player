@@ -184,7 +184,7 @@ function playTop() {
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .eyebrow {
   margin: 0;
@@ -205,12 +205,12 @@ function playTop() {
 .seg {
   display: inline-flex;
   padding: 3px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(var(--fg-rgb), 0.07);
 }
 .seg button {
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 6px 14px;
   background: none;
   font-size: 13px;
@@ -257,7 +257,7 @@ function playTop() {
   display: inline-block;
   margin: 10px 0 0;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 700;
 }
@@ -337,7 +337,7 @@ function playTop() {
 .link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   border: 0;
   background: none;
   color: var(--accent);
@@ -395,7 +395,7 @@ function playTop() {
 .persona-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0 0 4px;
   font-size: 22px;
   font-weight: 800;
@@ -429,7 +429,7 @@ function playTop() {
   padding-left: 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   font-size: 13px;
 }
 .empty {

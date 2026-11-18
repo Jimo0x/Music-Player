@@ -120,7 +120,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey, { capture: tr
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: min(360px, 100%);
   padding: 22px;
   border-radius: 16px;
@@ -174,7 +174,7 @@ h2 {
 }
 .actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
 }
 .actions .pill {

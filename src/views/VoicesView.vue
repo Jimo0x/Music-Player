@@ -102,13 +102,13 @@ function openMenu(event: MouseEvent, t: Track) {
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   margin-bottom: 16px;
 }
 .chips button {
   padding: 6px 13px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(var(--fg-rgb), 0.08);
   color: var(--text-2);
   font-size: 13px;
@@ -125,7 +125,7 @@ function openMenu(event: MouseEvent, t: Track) {
 .voice {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   height: 100%;
   padding: 0 8px;
   border-radius: 8px;

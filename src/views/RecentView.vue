@@ -144,7 +144,7 @@ h2 {
   max-width: 280px;
   padding: 8px 14px 8px 8px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(var(--fg-rgb), 0.06);
   color: var(--text);
   text-align: left;
@@ -167,7 +167,7 @@ h2 {
 .voices-link {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   margin: 0 0 24px;
   padding: 12px 14px;

@@ -112,7 +112,7 @@ async function reveal(path: string) {
 }
 .count {
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 180, 84, 0.16);
   color: var(--warning);
   font-size: 12px;
@@ -128,7 +128,7 @@ async function reveal(path: string) {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   margin-bottom: 6px;
 }
 .folder-name {

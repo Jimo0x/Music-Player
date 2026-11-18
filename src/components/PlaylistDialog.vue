@@ -381,7 +381,7 @@ onBeforeUnmount(() => {
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   padding: 24px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: rgba(var(--surface-rgb), 0.97);
   box-shadow: var(--shadow), inset 0 0 0 0.5px rgba(var(--fg-rgb), 0.12);
   animation: pop 0.25s var(--ease);
@@ -449,7 +449,7 @@ h2 {
 }
 .tabs {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   margin: 16px 0 12px;
   padding: 3px;
   border-radius: 9px;
@@ -486,7 +486,7 @@ h2 {
 .swatches {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
+  gap: var(--space-2);
 }
 .swatch {
   position: relative;
@@ -544,7 +544,7 @@ h2 {
 .row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .row.wrap {
   flex-wrap: wrap;
@@ -553,7 +553,7 @@ h2 {
 .slider {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 .slider em {
   font-style: normal;
@@ -572,7 +572,7 @@ h2 {
   height: 28px;
   padding: 0 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: none;
   font-size: 12.5px;
   color: var(--text-2);
@@ -584,7 +584,7 @@ h2 {
 .ink {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: 12.5px;
   color: var(--text-2);
   cursor: pointer;
@@ -607,7 +607,7 @@ h2 {
 .toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: 13px;
   cursor: pointer;
 }
@@ -626,7 +626,7 @@ h2 {
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: 22px;
 }
 .pill:disabled {

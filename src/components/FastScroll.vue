@@ -97,7 +97,7 @@ watch(shown, () => requestAnimationFrame(follow));
   translate: 0 -50%;
   min-width: 52px;
   padding: 8px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--accent);
   color: var(--on-accent);
   font-size: 22px;

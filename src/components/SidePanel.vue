@@ -44,7 +44,7 @@ const ui = useUiStore();
 .tabs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   padding: 12px 12px 6px;
 }
 .tabs > button:not(.close) {

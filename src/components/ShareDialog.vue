@@ -158,7 +158,7 @@ header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   margin-bottom: 6px;
 }
 .kicker {
@@ -254,7 +254,7 @@ h3 {
 .empty {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 2px 0;
   font-size: 12.5px;
   color: var(--text-3);
@@ -267,7 +267,7 @@ h3 {
 }
 .code {
   padding: 8px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(var(--fg-rgb), 0.08);
   font-family: var(--font-display);
   font-size: 19px;

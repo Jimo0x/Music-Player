@@ -60,11 +60,11 @@ function present(p: Playlist): number {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .head-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .grid {
   display: grid;
@@ -77,7 +77,7 @@ function present(p: Playlist): number {
 .card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   width: 100%;
   min-width: 0;
   padding: 0;

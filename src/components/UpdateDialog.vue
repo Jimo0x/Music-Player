@@ -162,7 +162,7 @@ h2 {
 .btn {
   min-height: 50px;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   font-size: 16px;
   font-weight: 700;
   -webkit-tap-highlight-color: transparent;

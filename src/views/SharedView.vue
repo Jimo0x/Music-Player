@@ -97,17 +97,17 @@ function play(s: SharedTrack) {
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   margin-bottom: 20px;
 }
 .filters button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   height: 36px;
   padding: 0 14px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg-hover);
   color: var(--text-2);
   font: inherit;
@@ -153,14 +153,14 @@ ul {
   margin: 0;
   padding: 0;
   list-style: none;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--bg-hover);
   overflow: hidden;
 }
 .item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   min-height: 58px;
   padding: 8px 12px 8px 14px;
 }

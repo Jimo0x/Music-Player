@@ -206,7 +206,7 @@ function leave() {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   max-width: 420px;
   font-size: 13px;
   font-weight: 600;

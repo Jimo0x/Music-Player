@@ -458,7 +458,7 @@ async function copyMissing(list: MatchedPlaylist[]) {
 }
 .link-form {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
 }
 .link-form input {
@@ -482,7 +482,7 @@ async function copyMissing(list: MatchedPlaylist[]) {
 .spotdl-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .fetch-jobs {
   display: grid;

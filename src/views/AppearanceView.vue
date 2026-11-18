@@ -552,7 +552,7 @@ const VINYL_COLORS: { id: VinylColor; label: string }[] = [
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .card {
   margin-bottom: 16px;
@@ -568,12 +568,12 @@ h2 {
 .themes {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
 }
 .theme {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 6px;
   border: 0;
   border-radius: 12px;
@@ -641,7 +641,7 @@ h2 {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: 14px;
   padding: 10px 12px;
   border-radius: 9px;
@@ -651,7 +651,7 @@ h2 {
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: 16px;
 }
 .link {
@@ -752,7 +752,7 @@ h2 {
 .role-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   padding: 10px 0 0;
   border: 0;
@@ -832,9 +832,9 @@ h2 {
 .seg {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-1);
   padding: 3px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(var(--fg-rgb), 0.06);
 }
 .seg button {
@@ -862,13 +862,13 @@ h2 {
   gap: 10px;
   margin: 14px 0 4px;
   padding: 14px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(var(--fg-rgb), 0.03);
 }
 .demo-field {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   max-width: 320px;
   height: 38px;
   margin-top: 4px;
@@ -896,10 +896,10 @@ h2 {
 .icon-style {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 12px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(var(--fg-rgb), 0.05);
   color: var(--text);
   text-align: left;
@@ -956,7 +956,7 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .app-icons {
   display: grid;

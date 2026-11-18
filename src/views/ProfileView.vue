@@ -170,12 +170,12 @@ async function copyCode() {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   width: 100%;
   font-size: 13px;
   font-weight: 600;
@@ -193,7 +193,7 @@ async function copyCode() {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: 13px;
 }
 .code {
@@ -225,7 +225,7 @@ async function copyCode() {
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 8px;
+  gap: var(--space-2);
 }
 .stats button {
   display: flex;
@@ -234,7 +234,7 @@ async function copyCode() {
   gap: 2px;
   padding: 10px 4px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: none;
   color: var(--text-2);
   font-size: 12.5px;
@@ -254,10 +254,10 @@ async function copyCode() {
 .links button {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 12px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: none;
   color: var(--text);
   font-size: 15px;

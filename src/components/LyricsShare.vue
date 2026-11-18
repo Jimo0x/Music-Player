@@ -264,7 +264,7 @@ header {
   height: 38px;
   padding: 0 16px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--pill, var(--accent));
   color: var(--pill-ink, #fff);
   font: inherit;
@@ -335,7 +335,7 @@ header {
   min-height: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: 16px;
+  gap: var(--space-4);
   padding: 4px 16px 18px;
 }
 /* L'aperçu tient dans la place laissée par les réglages, quel que soit le format (story compris). */
@@ -367,7 +367,7 @@ header {
 }
 .controls {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
   justify-items: center;
 }
 .choice {
@@ -380,7 +380,7 @@ header {
   height: 34px;
   padding: 0 14px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(var(--fg-rgb), 0.08);
   color: var(--text-2);
   font: inherit;
@@ -396,7 +396,7 @@ header {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .sheet-enter-active,
 .sheet-leave-active {
