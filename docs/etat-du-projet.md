@@ -1,12 +1,13 @@
 # État du projet
 
-Mis à jour le 18 novembre 2026, à la publication de la **0.8.0**. À tenir à jour à chaque
+Mis à jour le 18 novembre 2026, à la publication de la **0.9.0**. À tenir à jour à chaque
 version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
 
 ## Versions récentes
 
 | Version | Date | Contenu principal |
 | --- | --- | --- |
+| 0.9.0 | 18/11/2026 | Sons Dolby (AC-3/E-AC-3 5.1) lus partout en Rust pur ; Opus en .m4a lu sans ffmpeg (Audiolab) ; commandes de l'écran verrouillé et touches multimédias sur Windows et Linux (MPRIS) ; page Télécharger (lien direct, lien Spotify, recherche) ; boutons de l'import Spotify remis ; propositions en fin de file ; premier scan qui montre son avancement et ne bloque plus ; visualiseur allégé en mode léger ; tri dans Titres aimés ; Mo et temps restant pendant un envoi dans la discussion |
 | 0.8.0 | 18/11/2026 | Cartes de paroles « Arcane » (tarot) ; bouton retour Android = MENU en mode baladeur ; noms d'artistes tirés des titres de vidéos nettoyés ; avancement des téléchargements ; CSP activée ; partage Wi-Fi chiffré ; relais sans routes de compte ; actions CI v5 ; styles en variables du thème ; lot playlists (sélection multiple, ajout à plusieurs playlists, tri dans une playlist, ajout depuis l'écran de lecture) ; guide du contributeur |
 | 0.7.1 | 12/11/2026 | Play Protect : l'appli n'installe plus d'APK (mise à jour par le navigateur) ; page de playlist virtualisée ; envoi par code par parties ; salle du relais gardée pendant un transfert |
 | 0.7.0 | 12/11/2026 | Mode baladeur (téléphone) : boîtier, molette tactile, 5 finitions, paroles sur petit écran |
@@ -20,8 +21,8 @@ version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
 - **Pochettes des playlists de Méryl** (Android 10, Chrome 114) : correction envoyée, jamais
   vérifiée sur son téléphone. Les deux autres points de son avis (saisie de la discussion
   sous le clavier, champ d'avis en pilule) sont corrigés depuis le 11/11.
-- Corrigés le 18/11, pas encore publiés ni essayés sur téléphone (avis à marquer
-  « Traité » après publication) :
+- Corrigés en 0.9.0, pas encore essayés sur téléphone (avis à marquer « Traité » une fois
+  confirmés) :
   - **Audiolab** : WAV (16/24/32 bits, ADPCM) et AAC/.m4a étaient déjà lus sans ffmpeg ; le
     trou était l'Opus rangé dans un .m4a, illisible sur Android. Désormais décodé par
     `opus.rs` (paquets séparés par symphonia, en-tête « dOps » en gros-boutiste).
@@ -92,8 +93,12 @@ version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
 
 ### Mis de côté par le propriétaire
 
-- Mini-lecteur sur l'écran verrouillé.
-- Spotify (accès retirés, code gardé).
+- Spotify (accès retirés, code gardé ; l'import par lien et les téléchargements restent).
+- **Plus tard** : remettre (ou proposer en option) l'ancienne mise à jour Android, installée
+  par l'appli elle-même (code retiré dans cf04e2a : `AndroidUpdate.download`, `__mpUpdate`,
+  service de téléchargement). Décision du 18/11 : on garde le navigateur pour l'instant,
+  l'ancienne méthode faisait réagir Play Protect à chaque mise à jour.
+- Le lecteur sur l'écran verrouillé n'est plus mis de côté : option B choisie le 18/11.
 
 ## Repères techniques récents
 
