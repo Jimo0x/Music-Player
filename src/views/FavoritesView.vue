@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useSelectionPool } from "@/lib/selection";
+import { useUiStore } from "@/stores/ui";
 import { computed } from "vue";
 import { formatCollection } from "@/lib/format";
 import { useFavoritesStore } from "@/stores/favorites";
@@ -16,6 +18,8 @@ const player = usePlayerStore();
 // Les plus récemment aimés en premier : l'ordre n'est pas gardé côté Rust (un simple
 // ensemble), donc on retombe sur l'ordre de la bibliothèque, le plus stable disponible.
 const tracks = computed(() => library.tracks.filter((t) => favorites.isFavorite(t.id)));
+const ui = useUiStore();
+useSelectionPool(() => tracks.value.map((t) => t.id));
 const totalDuration = computed(() => tracks.value.reduce((s, t) => s + t.duration_secs, 0));
 
 function play(index: number) {
@@ -31,9 +35,14 @@ function play(index: number) {
         <h1 class="page-title">Titres aimés</h1>
         <p class="page-sub">{{ formatCollection(tracks.length, totalDuration) }}</p>
       </div>
-      <button v-if="tracks.length" type="button" class="pill pill-ghost" @click="player.playShuffled(tracks.map((t) => t.id))">
-        <Icon name="shuffle" :size="15" /> Tout en aléatoire
-      </button>
+      <div v-if="tracks.length" class="top-actions">
+        <button type="button" class="pill pill-ghost" :class="{ on: ui.selecting }" @click="ui.selecting ? ui.clearSelection() : ui.startSelection()">
+          <Icon name="check" :size="15" /> {{ ui.selecting ? "Terminer" : "Sélectionner" }}
+        </button>
+        <button type="button" class="pill pill-ghost" @click="player.playShuffled(tracks.map((t) => t.id))">
+          <Icon name="shuffle" :size="15" /> Tout en aléatoire
+        </button>
+      </div>
     </div>
     <p v-if="!tracks.length" class="empty">
       Aucun morceau aimé pour l'instant : touchez le cœur dans le menu d'un morceau (clic droit, ou « ⋯ »).
@@ -52,6 +61,12 @@ function play(index: number) {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+}
+.top-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 .empty {
   margin-top: 8px;

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useSelectionPool } from "@/lib/selection";
 import { computed } from "vue";
 import { formatCollection } from "@/lib/format";
 import { useLibraryStore } from "@/stores/library";
@@ -15,6 +16,7 @@ const ui = useUiStore();
 
 const album = computed(() => library.albumByKey(props.albumKey));
 const ids = computed(() => album.value?.tracks.map((t) => t.id) ?? []);
+useSelectionPool(() => ids.value);
 const genre = computed(() => album.value?.tracks.find((t) => t.genre)?.genre ?? null);
 const others = computed(() =>
   album.value ? library.albums.filter((a) => a.artist === album.value!.artist && a.key !== album.value!.key).slice(0, 12) : [],

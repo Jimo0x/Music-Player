@@ -159,6 +159,9 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
             <h2>{{ track.title }}</h2>
             <p>{{ track.artist }}<template v-if="track.album !== 'Album inconnu'"> — {{ track.album }}</template></p>
           </div>
+          <button type="button" class="icon-btn like-now" aria-label="Ajouter à des playlists" title="Ajouter à des playlists" @click="ui.addToPlaylists = [track.id]">
+            <Icon name="playlist" :size="19" />
+          </button>
           <button
             type="button"
             class="icon-btn like-now"

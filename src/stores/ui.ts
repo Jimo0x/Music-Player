@@ -76,6 +76,13 @@ export const useUiStore = defineStore("ui", {
     backupToRestore: null as string | null,
     /** Playlist dans laquelle on choisit des morceaux à ajouter (sélecteur plein écran). */
     trackPicker: null as string | null,
+    /** Sélection de plusieurs morceaux (appui long sur téléphone, « Sélectionner » ailleurs). */
+    selecting: false,
+    selected: [] as string[],
+    /** Morceaux de la liste affichée, pour « Tout sélectionner ». */
+    selectionPool: [] as string[],
+    /** Fenêtre « Ajouter à des playlists » ouverte pour ces morceaux. */
+    addToPlaylists: null as string[] | null,
     /** Recherche manuelle de paroles ouverte (pour le morceau en cours). */
     lyricsSearch: false,
     /** Fenêtre « Partager un extrait » des paroles ouverte. */
@@ -119,6 +126,22 @@ export const useUiStore = defineStore("ui", {
       else this.nowPlayingOpen = false;
     },
     /** Retour arrière (bouton retour d'Android, geste, souris). */
+    /** Entre en sélection (avec ce morceau déjà coché, s'il est donné). */
+    startSelection(trackId?: string) {
+      if (!this.selecting) push(this.nowPlayingOpen ? "np" : "route");
+      this.selecting = true;
+      if (trackId && !this.selected.includes(trackId)) this.selected = [...this.selected, trackId];
+    },
+    toggleSelected(trackId: string) {
+      this.selected = this.selected.includes(trackId) ? this.selected.filter((id) => id !== trackId) : [...this.selected, trackId];
+    },
+    selectAll() {
+      this.selected = this.selected.length === this.selectionPool.length ? [] : [...this.selectionPool];
+    },
+    clearSelection() {
+      this.selecting = false;
+      this.selected = [];
+    },
     /** Confie le bouton retour à un mode plein écran (une entrée d'historique le retient). */
     holdBack(handler: () => void) {
       this.overlayBack = handler;
@@ -144,12 +167,14 @@ export const useUiStore = defineStore("ui", {
           return;
         }
       }
-      if (this.menu || this.playlistDialog || this.trackPicker || this.lyricsSearch) {
-        // Un menu ou une fenêtre ouverte se ferme sans changer de page.
+      if (this.menu || this.playlistDialog || this.trackPicker || this.lyricsSearch || this.addToPlaylists || this.selecting) {
+        // Un menu, une fenêtre ou une sélection en cours se ferme sans changer de page.
         this.menu = null;
         this.playlistDialog = null;
         this.trackPicker = null;
         this.lyricsSearch = false;
+        if (this.addToPlaylists) this.addToPlaylists = null;
+        else this.clearSelection();
         push(this.nowPlayingOpen ? "np" : "route");
         return;
       }

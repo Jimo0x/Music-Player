@@ -1,21 +1,23 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { collator, formatCollection, formatDuration } from "@/lib/format";
+import { formatCollection, formatDuration } from "@/lib/format";
+import { SORT_KEYS, SORTS, sortTracks, type SortKey } from "@/lib/trackSort";
 import { remembered } from "@/lib/remember";
-import type { Track } from "@/lib/types";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
 import FastScroll from "@/components/FastScroll.vue";
 import Icon from "@/components/Icon.vue";
 import TrackRow from "@/components/TrackRow.vue";
 import VirtualList from "@/components/VirtualList.vue";
+import { useSelectionPool } from "@/lib/selection";
+import { useUiStore } from "@/stores/ui";
 
 const library = useLibraryStore();
 const player = usePlayerStore();
 
-type Key = "title" | "artist" | "album" | "duration" | "added";
+type Key = SortKey;
 // Le tri choisi reste d'une visite à l'autre.
-const sortKey = remembered<Key>("mp:tri-morceaux", "title", ["title", "artist", "album", "duration", "added"]);
+const sortKey = remembered<Key>("mp:tri-morceaux", "title", SORT_KEYS);
 const order = remembered<"asc" | "desc">("mp:tri-morceaux-sens", "asc", ["asc", "desc"]);
 const ascending = computed({
   get: () => order.value === "asc",
@@ -24,24 +26,6 @@ const ascending = computed({
   },
 });
 
-const comparators: Record<Key, (a: Track, b: Track) => number> = {
-  title: (a, b) => collator.compare(a.title, b.title),
-  artist: (a, b) => collator.compare(a.artist, b.artist) || collator.compare(a.title, b.title),
-  album: (a, b) => collator.compare(a.album, b.album) || (a.track_no ?? 0) - (b.track_no ?? 0),
-  duration: (a, b) => a.duration_secs - b.duration_secs,
-  added: (a, b) => a.added_secs - b.added_secs || collator.compare(a.title, b.title),
-};
-
-// Tris proposés dans le menu (téléphone compris, où les en-têtes de colonnes sont masqués).
-const SORTS: { id: string; label: string; key: Key; ascending: boolean }[] = [
-  { id: "title", label: "Titre (A-Z)", key: "title", ascending: true },
-  { id: "title-desc", label: "Titre (Z-A)", key: "title", ascending: false },
-  { id: "recent", label: "Plus récents", key: "added", ascending: false },
-  { id: "oldest", label: "Plus anciens", key: "added", ascending: true },
-  { id: "artist", label: "Artiste (A-Z)", key: "artist", ascending: true },
-  { id: "album", label: "Album (A-Z)", key: "album", ascending: true },
-  { id: "duration", label: "Durée", key: "duration", ascending: true },
-];
 const sortId = computed({
   get: () => SORTS.find((s) => s.key === sortKey.value && s.ascending === ascending.value)?.id ?? "",
   set: (id: string) => {
@@ -52,10 +36,9 @@ const sortId = computed({
   },
 });
 
-const tracks = computed(() => {
-  const sorted = [...library.tracks].sort(comparators[sortKey.value]);
-  return ascending.value ? sorted : sorted.reverse();
-});
+const tracks = computed(() => sortTracks(library.tracks, sortKey.value, ascending.value));
+const ui = useUiStore();
+useSelectionPool(() => tracks.value.map((t) => t.id));
 
 function sortBy(key: Key) {
   if (sortKey.value === key) ascending.value = !ascending.value;
@@ -96,6 +79,9 @@ function play(index: number) {
             <option v-for="s in SORTS" :key="s.id" :value="s.id">{{ s.label }}</option>
           </select>
         </label>
+        <button type="button" class="pill pill-ghost" :class="{ on: ui.selecting }" @click="ui.selecting ? ui.clearSelection() : ui.startSelection()">
+          <Icon name="check" :size="15" /> {{ ui.selecting ? "Terminer" : "Sélectionner" }}
+        </button>
         <button type="button" class="pill pill-ghost" @click="player.playShuffled(tracks.map((t) => t.id))">
           <Icon name="shuffle" :size="15" /> Tout en aléatoire
         </button>

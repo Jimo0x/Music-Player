@@ -54,6 +54,12 @@ function onKey(e: KeyboardEvent) {
 onMounted(() => window.addEventListener("keydown", onKey));
 onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
 
+/** Fenêtre à cases à cocher : ce morceau dans plusieurs playlists d'un coup. */
+function addToSeveral() {
+  if (!track.value) return;
+  ui.addToPlaylists = [track.value.id];
+  ui.menu = null;
+}
 async function addTo(playlistId: string, name: string) {
   if (!track.value) return;
   await playlists.addTrack(playlistId, track.value.id);
@@ -115,6 +121,7 @@ function share() {
       </button>
       <div v-if="showPlaylists" class="sub">
         <button type="button" role="menuitem" @click="addToNew">＋ Nouvelle playlist</button>
+        <button type="button" role="menuitem" @click="addToSeveral">Plusieurs playlists…</button>
         <button
           v-for="p in playlists.items"
           :key="p.id"

@@ -26,3 +26,35 @@ describe("recherche", () => {
     expect(ui.history.length).toBe(depth);
   });
 });
+
+describe("sélection de plusieurs morceaux", () => {
+  it("coche, décoche, tout sélectionner puis rien, et se termine", () => {
+    const ui = useUiStore();
+    ui.selectionPool = ["a", "b", "c"];
+    ui.startSelection("b");
+    expect(ui.selecting).toBe(true);
+    expect(ui.selected).toEqual(["b"]);
+    ui.toggleSelected("c");
+    ui.toggleSelected("b");
+    expect(ui.selected).toEqual(["c"]);
+    ui.selectAll();
+    expect(ui.selected).toEqual(["a", "b", "c"]);
+    ui.selectAll();
+    expect(ui.selected).toEqual([]);
+    ui.clearSelection();
+    expect(ui.selecting).toBe(false);
+  });
+
+  it("le bouton retour ferme d'abord la fenêtre, puis la sélection, sans changer de page", () => {
+    const ui = useUiStore();
+    ui.go({ name: "songs" });
+    ui.startSelection("a");
+    ui.addToPlaylists = ["a"];
+    ui.onPopState();
+    expect(ui.addToPlaylists).toBeNull();
+    expect(ui.selecting).toBe(true);
+    ui.onPopState();
+    expect(ui.selecting).toBe(false);
+    expect(ui.route).toEqual({ name: "songs" });
+  });
+});

@@ -27,8 +27,23 @@ const favorites = useFavoritesStore();
 const isCurrent = computed(() => player.currentTrack?.id === props.track.id);
 const liked = computed(() => favorites.isFavorite(props.track.id));
 
+const selected = computed(() => ui.selecting && ui.selected.includes(props.track.id));
+
 function openMenu(event: MouseEvent) {
   ui.menu = { x: event.clientX, y: event.clientY, trackId: props.track.id, playlistId: props.playlistId };
+}
+/** Appui long (écran tactile) : sélection de plusieurs morceaux ; clic droit : le menu. */
+function onContextMenu(event: MouseEvent) {
+  if (ui.isTouch) ui.startSelection(props.track.id);
+  else openMenu(event);
+}
+function onClick() {
+  if (ui.selecting) ui.toggleSelected(props.track.id);
+  else if (ui.isMobile || ui.isTouch) emit("play");
+}
+function onPlay() {
+  if (ui.selecting) ui.toggleSelected(props.track.id);
+  else emit("play");
 }
 async function toggleLike() {
   await favorites.toggle(props.track.id);
@@ -38,13 +53,14 @@ async function toggleLike() {
 <template>
   <div
     class="track-row"
-    :class="[variant, { current: isCurrent, striped: striped && index % 2 === 1 }]"
+    :class="[variant, { current: isCurrent, striped: striped && index % 2 === 1, selecting: ui.selecting, selected }]"
     role="row"
     tabindex="0"
-    @dblclick="emit('play')"
-    @click="(ui.isMobile || ui.isTouch) && emit('play')"
-    @keydown.enter="emit('play')"
-    @contextmenu.prevent="openMenu"
+    :aria-selected="ui.selecting ? selected : undefined"
+    @dblclick="!ui.selecting && emit('play')"
+    @click="onClick"
+    @keydown.enter="onPlay"
+    @contextmenu.prevent="onContextMenu"
   >
     <div class="lead">
       <template v-if="variant === 'album'">
@@ -53,9 +69,10 @@ async function toggleLike() {
       </template>
       <div v-else class="thumb">
         <Artwork :track="track" :radius="4" />
+        <span v-if="ui.selecting" class="check" :class="{ on: selected }" aria-hidden="true"><Icon v-if="selected" name="check" :size="14" /></span>
         <span v-if="isCurrent && !player.isPaused" class="bars over"><i /><i /><i /></span>
       </div>
-      <button class="play-hover" type="button" :aria-label="`Lire ${track.title}`" @click.stop="emit('play')">
+      <button v-if="!ui.selecting" class="play-hover" type="button" :aria-label="`Lire ${track.title}`" @click.stop="emit('play')">
         <Icon name="play" :size="14" />
       </button>
     </div>
@@ -94,6 +111,23 @@ async function toggleLike() {
 </template>
 
 <style scoped>
+.track-row.selected {
+  background: var(--accent-soft);
+}
+.check {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--on-accent);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+.check.on {
+  background: var(--accent);
+  box-shadow: none;
+}
 .track-row {
   display: grid;
   grid-template-columns: 44px minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 56px 28px 32px;

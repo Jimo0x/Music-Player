@@ -112,6 +112,16 @@ function toggleMute() {
       >
         <Icon :name="appearance.light ? 'moon' : 'sun'" :size="17" />
       </button>
+      <button
+        v-if="player.currentTrack"
+        type="button"
+        class="icon-btn"
+        title="Ajouter à des playlists"
+        aria-label="Ajouter à des playlists"
+        @click="ui.addToPlaylists = [player.currentTrack.id]"
+      >
+        <Icon name="playlist" :size="18" />
+      </button>
       <button type="button" class="icon-btn" :class="{ on: ui.panel === 'lyrics' }" title="Paroles" aria-label="Paroles" :aria-pressed="ui.panel === 'lyrics'" @click="ui.togglePanel('lyrics')">
         <Icon name="lyrics" :size="18" />
       </button>

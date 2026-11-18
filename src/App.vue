@@ -23,6 +23,8 @@ import MobileBar from "@/components/MobileBar.vue";
 import MobileTop from "@/components/MobileTop.vue";
 import NowPlaying from "@/components/NowPlaying.vue";
 import Baladeur from "@/components/Baladeur.vue";
+import AddToPlaylists from "@/components/AddToPlaylists.vue";
+import SelectionBar from "@/components/SelectionBar.vue";
 import { useBaladeurStore } from "@/stores/baladeur";
 import LyricsSearch from "@/components/LyricsSearch.vue";
 import LyricsShare from "@/components/LyricsShare.vue";
@@ -74,6 +76,11 @@ const eq = useEqStore();
 const appearance = useAppearanceStore();
 const ui = useUiStore();
 const baladeur = useBaladeurStore();
+// Changer de page termine la sélection de morceaux en cours.
+watch(
+  () => JSON.stringify(ui.route),
+  () => ui.clearSelection(),
+);
 setBanner((message) => ui.notify(message));
 // Clé de la transition de page : le nom de la route suffit, sauf pour un album ou une
 // playlist (sinon ouvrir un autre album ne jouerait pas la transition).
@@ -479,6 +486,8 @@ onBeforeUnmount(() => {
       <Baladeur v-if="ui.isMobile && baladeur.enabled && library.root" />
     </Transition>
     <MobileBar v-if="ui.isMobile" />
+    <SelectionBar />
+    <AddToPlaylists />
     <UpdateDialog />
     <ShareDialog />
     <FeedbackDialog />

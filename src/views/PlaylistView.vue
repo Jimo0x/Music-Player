@@ -12,6 +12,9 @@ import Icon from "@/components/Icon.vue";
 import PlaylistCover from "@/components/PlaylistCover.vue";
 import TrackRow from "@/components/TrackRow.vue";
 import VirtualList from "@/components/VirtualList.vue";
+import { remembered } from "@/lib/remember";
+import { useSelectionPool } from "@/lib/selection";
+import { SORTS, sortTracks } from "@/lib/trackSort";
 
 const props = defineProps<{ id: string }>();
 const library = useLibraryStore();
@@ -22,10 +25,19 @@ const appearance = useAppearanceStore();
 const shareStore = useShareStore();
 
 const playlist = computed(() => playlists.byId(props.id));
-const tracks = computed(
+/** Morceaux dans l'ordre enregistré de la playlist. */
+const ordered = computed(
   () => (playlist.value?.track_ids.map((id) => library.byId(id)).filter(Boolean) as Track[]) ?? [],
 );
+// Tri à l'affichage (l'ordre enregistré ne change pas), gardé d'une visite à l'autre.
+const SORT_IDS = ["perso", ...SORTS.map((s) => s.id)];
+const sortId = remembered<string>("mp:tri-playlist", "perso", SORT_IDS);
+const tracks = computed(() => {
+  const s = SORTS.find((x) => x.id === sortId.value);
+  return s ? sortTracks(ordered.value, s.key, s.ascending) : ordered.value;
+});
 const ids = computed(() => tracks.value.map((t) => t.id));
+useSelectionPool(() => ids.value);
 // Morceaux de la playlist dont le fichier n'est plus dans la bibliothèque (déplacé, supprimé).
 const missing = computed(() =>
   library.scanning ? [] : (playlist.value?.track_ids.filter((id) => !library.byId(id)) ?? []),
@@ -111,6 +123,9 @@ function share() {
             <Icon name="queue" :size="15" /> Lire ensuite
           </button>
           <button type="button" class="pill pill-ghost" @click="ui.trackPicker = playlist.id"><Icon name="plus" :size="15" /> Ajouter</button>
+          <button v-if="ids.length" type="button" class="pill pill-ghost" :class="{ on: ui.selecting }" @click="ui.selecting ? ui.clearSelection() : ui.startSelection()">
+            <Icon name="check" :size="15" /> {{ ui.selecting ? "Terminer" : "Sélectionner" }}
+          </button>
           <button type="button" class="icon-btn" title="Personnaliser (nom, jaquette)" aria-label="Personnaliser la playlist" @click="ui.playlistDialog = { mode: 'edit', id: playlist.id }"><Icon name="brush" :size="17" /></button>
           <button type="button" class="icon-btn" title="Partager cette playlist" aria-label="Partager cette playlist" :disabled="!ids.length" @click="share"><Icon name="share" :size="17" /></button>
           <button type="button" class="icon-btn" title="Supprimer la playlist" aria-label="Supprimer la playlist" @click="remove"><Icon name="trash" :size="17" /></button>
@@ -118,6 +133,13 @@ function share() {
       </div>
     </header>
 
+    <label v-if="tracks.length > 1" class="sort">
+      <span class="muted">Trier</span>
+      <select v-model="sortId" class="fieldbox" aria-label="Trier la playlist">
+        <option value="perso">Ordre de la playlist</option>
+        <option v-for="s in SORTS" :key="s.id" :value="s.id">{{ s.label }}</option>
+      </select>
+    </label>
     <div v-if="!tracks.length" class="empty">
       <p>Cette playlist est vide.</p>
       <p class="muted">Cherchez et cochez autant de morceaux, d'albums ou d'artistes que vous voulez.</p>
@@ -135,6 +157,13 @@ function share() {
 </template>
 
 <style scoped>
+.sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  font-size: 13px;
+}
 .warn {
   color: var(--warning);
 }
