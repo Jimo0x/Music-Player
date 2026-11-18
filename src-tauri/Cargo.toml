@@ -74,6 +74,8 @@ tauri-plugin-single-instance = "2"
 # Rafraîchir les icônes de l'Explorateur après avoir changé celle des raccourcis.
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_UI_Shell", "Win32_System_Power"] }
+# Commandes multimédias de Windows (écran verrouillé, volet du volume, touches du clavier). MIT.
+souvlaki = { version = "0.9.3", default-features = false }
 # Inscription comme lecteur par défaut (Paramètres → Applications par défaut).
 winreg = "0.55"
 

@@ -471,6 +471,8 @@ export function installTauriMock() {
     parcel_import: () => ({ name: "Son reçu", kind: "track", added_tracks: 1, skipped_tracks: 0, playlist_id: null, track_ids: [] }),
     parcel_forget: () => undefined,
     // Visualiseur : spectre de démonstration qui « bat » à 120 BPM pendant la lecture.
+    media_update: () => null,
+    media_clear: () => null,
     get_spectrum: () => {
       if (isPaused) return [];
       const t = performance.now() / 1000;

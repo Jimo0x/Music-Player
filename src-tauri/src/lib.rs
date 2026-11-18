@@ -8,6 +8,7 @@ pub mod eq;
 pub mod favorites;
 pub mod ffmpeg;
 pub mod library;
+pub mod media_controls;
 pub mod listening;
 pub mod lyrics;
 pub mod nearby;
@@ -68,6 +69,12 @@ pub fn run() {
             // dossier visible, avant le scan qui les y retrouvera.
             sharing::remember_moved(sharing::move_received(&state));
             app.manage(state);
+            // Écran verrouillé et touches multimédias (Windows).
+            let system_media = media_controls::SystemMedia::default();
+            if let Some(window) = app.get_webview_window("main") {
+                system_media.attach(app.handle(), &window);
+            }
+            app.manage(system_media);
 
             // Moteur de téléchargement : file enregistrée, reprise des morceaux restés en attente.
             let (fetch_runtime, fetch_problem) = fetch::commands::FetchRuntime::open(&data_dir);
@@ -209,6 +216,8 @@ pub fn run() {
             commands::read_backup,
             commands::import_listens,
             commands::get_spectrum,
+            media_controls::media_update,
+            media_controls::media_clear,
             commands::make_default_player,
             commands::list_favorites,
             commands::export_track,

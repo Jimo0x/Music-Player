@@ -1,6 +1,7 @@
 // Pont avec la notification de lecture Android (écran verrouillé, volet de notifications,
 // casque Bluetooth). L'activité Android expose `window.AndroidMedia` ; ses commandes
-// reviennent par `window.__mpMedia`. Sans effet ailleurs (ordinateur, navigateur).
+// reviennent par `window.__mpMedia`. Sur ordinateur, le même pont passe par Rust : écran
+// verrouillé, volet du volume et touches multimédias de Windows (media_controls.rs).
 
 import { watch } from "vue";
 import { api } from "./api";
@@ -188,9 +189,18 @@ export function keepScreenOn(on: boolean) {
 
 type Player = ReturnType<typeof usePlayerStore>;
 
+/** Ordinateur : le morceau part vers Rust, les boutons du système reviennent en événements. */
+function desktopBridge(): AndroidMediaBridge {
+  void api.onMediaCommand((command, arg) => window.__mpMedia?.(command, arg)).catch(() => {});
+  return {
+    update: (json) => void api.mediaUpdate(json).catch(() => {}),
+    clear: () => void api.mediaClear().catch(() => {}),
+    keepScreenOn: () => {},
+  };
+}
+
 export function installAndroidMedia(player: Player) {
-  const bridge = window.AndroidMedia;
-  if (!bridge) return;
+  const bridge = window.AndroidMedia ?? desktopBridge();
 
   window.__mpMedia = (command, arg) => {
     if (!player.currentTrack) return;
@@ -212,6 +222,9 @@ export function installAndroidMedia(player: Player) {
         break;
       case "seek":
         void player.seek(arg / 1000);
+        break;
+      case "seekBy":
+        void player.seek(Math.max(0, player.positionAt(performance.now()) + arg / 1000));
         break;
     }
   };

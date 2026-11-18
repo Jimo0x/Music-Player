@@ -140,6 +140,12 @@ export const api = {
   importListens: (listens: import("./recap").Listen[]) => invoke<number>("import_listens", { listens }),
   /** Visualiseur : spectre du son joué (32 bandes, 0 à 255 ; vide en pause). */
   getSpectrum: () => invoke<number[]>("get_spectrum"),
+  /** Morceau affiché par Windows (écran verrouillé, volet du volume) ; sans effet ailleurs. */
+  mediaUpdate: (info: string) => invoke<void>("media_update", { info: JSON.parse(info) }),
+  mediaClear: () => invoke<void>("media_clear"),
+  /** Boutons multimédias du système (Windows) : même forme que les commandes d'Android. */
+  onMediaCommand: (handler: (command: string, arg: number) => void): Promise<UnlistenFn> =>
+    listen<{ command: string; arg: number }>("media-command", (e) => handler(e.payload.command, e.payload.arg)),
   /** Fichier audio reçu au lancement (« Ouvrir avec »), une seule fois. */
   takeOpenedFile: () => invoke<string | null>("take_opened_file"),
   /** Windows : inscrit l'appli comme lecteur possible et ouvre « Applications par défaut ». */

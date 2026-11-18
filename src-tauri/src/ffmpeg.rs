@@ -97,6 +97,47 @@ pub fn missing_ffmpeg_message(path: &Path) -> String {
     )
 }
 
+/// Son Dolby Digital (AC-3) ou Dolby Digital Plus (E-AC-3, souvent en 5.1) rangé dans un
+/// MP4 (`.m4a`) : le décodeur intégré ne le lit pas, seul ffmpeg le peut (pas sur Android).
+/// Cherche l'entrée « ac-3 » / « ec-3 » de la description des pistes (suivie de 6 octets nuls
+/// et de l'index de données 1) au début et à la fin du fichier, où se trouve l'en-tête.
+pub fn is_dolby_mp4(path: &Path) -> bool {
+    use std::io::{Read, Seek, SeekFrom};
+    const SPAN: u64 = 2 * 1024 * 1024;
+    if !matches!(extension_of(path).as_str(), "m4a" | "m4b" | "mp4") {
+        return false;
+    }
+    let Ok(mut file) = std::fs::File::open(path) else { return false };
+    let len = file.metadata().map(|m| m.len()).unwrap_or(0);
+    let found = |bytes: &[u8]| {
+        bytes.windows(12).any(|w| {
+            (&w[..4] == b"ec-3" || &w[..4] == b"ac-3") && w[4..10].iter().all(|b| *b == 0) && w[10..12] == [0, 1]
+        })
+    };
+    let mut head = Vec::new();
+    if file.by_ref().take(SPAN).read_to_end(&mut head).is_err() {
+        return false;
+    }
+    if found(&head) {
+        return true;
+    }
+    if len <= SPAN || file.seek(SeekFrom::Start(len - SPAN)).is_err() {
+        return false;
+    }
+    let mut tail = Vec::new();
+    file.read_to_end(&mut tail).is_ok() && found(&tail)
+}
+
+/// Pourquoi un son Dolby ne se lit pas ici (téléphone, ou ordinateur sans ffmpeg).
+pub fn dolby_message() -> String {
+    if cfg!(target_os = "android") {
+        "son Dolby (AC-3 / E-AC-3, souvent en 5.1), que les téléphones ne savent pas lire.          Convertissez-le en AAC sur l'ordinateur."
+            .into()
+    } else {
+        "son Dolby (AC-3 / E-AC-3) : installez ffmpeg pour le lire (Windows : winget install ffmpeg).".into()
+    }
+}
+
 /// Décode un fichier en WAV 16 bits stéréo (en mémoire) avec `ffmpeg`.
 pub fn decode_to_wav(path: &Path) -> Result<Vec<u8>, String> {
     let ffmpeg = find_tool("ffmpeg").ok_or_else(|| missing_ffmpeg_message(path))?;
@@ -192,6 +233,25 @@ pub fn probe(path: &Path) -> Option<ProbeInfo> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn dolby_in_m4a_is_recognised_from_its_track_description() {
+        let dir = tempfile::tempdir().unwrap();
+        let dolby = dir.path().join("dolby.m4a");
+        let mut bytes = vec![7u8; 5000];
+        bytes.extend_from_slice(b"   0ec-3       ");
+        bytes.extend_from_slice(&[9u8; 5000]);
+        std::fs::write(&dolby, &bytes).unwrap();
+        assert!(is_dolby_mp4(&dolby));
+        // Les mêmes lettres au hasard dans le son ne suffisent pas.
+        let aac = dir.path().join("aac.m4a");
+        std::fs::write(&aac, [vec![1u8; 100], b"ec-3abcdef".to_vec(), vec![1u8; 100]].concat()).unwrap();
+        assert!(!is_dolby_mp4(&aac));
+        // Autres extensions : jamais regardées.
+        let flac = dir.path().join("dolby.flac");
+        std::fs::write(&flac, &bytes).unwrap();
+        assert!(!is_dolby_mp4(&flac));
+    }
     use super::*;
 
     #[test]

@@ -44,6 +44,24 @@ version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
   plus écoutés, titres aimés, playlists, à redécouvrir) dans « À l'écoute » et dans « À
   suivre » (là, ajout à la suite du dernier morceau). Pas dans le mode baladeur.
 
+### Retours du 18/11 au soir
+
+- **Téléchargements spotDL / yt-dlp invisibles** : la page « Importer de Spotify » (qui
+  contient la file de téléchargements depuis la 0.6.0) n'avait plus aucun bouton depuis la
+  mise en suspens de Spotify le 28/10. Boutons remis (Playlists → « Depuis Spotify »,
+  Réglages → « Importer de Spotify… »). Le travail fait avec ChatGPT (étapes 1 à 9 du
+  moteur) était bien intégré. Sur téléphone, pas de téléchargement (outils absents).
+- **Sons de The Weeknd illisibles sur le Moov Smart Pro** : 73 fichiers (Trilogy, Starboy,
+  After Hours, Kiss Land) sont en Dolby E-AC-3 5.1 dans des .m4a ; le PC les lit par ffmpeg,
+  le téléphone n'a aucun décodeur. Désormais : raison claire à la lecture, et signalés dès
+  le scan sur téléphone (liste des fichiers abîmés). Conversion en AAC : décision en attente.
+- **Écran verrouillé du PC** : commandes multimédias de Windows (souvlaki, `media_controls.rs`)
+  branchées sur le même pont que la session média d'Android. **Pas encore essayé dans la
+  vraie appli** (l'appli installée était ouverte).
+- **Écran verrouillé Android façon Apple Music** : décision en attente (limites d'Android).
+- **Ensuite (demande du propriétaire)** : revue de sécurité, puis optimisation poussée, une
+  fois toutes les fonctions confirmées sur appareils.
+
 ### Vérifications sur de vrais appareils (rien de tout cela n'a été essayé sur téléphone)
 
 - CSP sur Android (vérifiée sur PC dans la vraie appli : écrans, pochettes, polices, relais).

@@ -29,6 +29,7 @@ function present(p: Playlist): number {
     <div class="head">
       <h1 class="page-title">Playlists</h1>
       <div class="head-actions">
+        <button type="button" class="pill pill-ghost" title="Recréer ses playlists Spotify avec sa musique, et télécharger les morceaux manquants" @click="ui.go({ name: 'spotify' })">Depuis Spotify</button>
         <button type="button" class="pill pill-ghost" @click="share.receiving = true"><Icon name="import" :size="15" /> Recevoir</button>
         <button type="button" class="pill pill-accent" @click="ui.playlistDialog = { mode: 'create' }"><Icon name="plus" :size="15" /> Nouvelle</button>
       </div>
