@@ -1,0 +1,9 @@
+# Toute modification est relue par le propriétaire du projet avant d'être fusionnée.
+# (Activer « Require review from Code Owners » dans la protection de la branche main.)
+* @LoickAmg
+
+# Zones sensibles : sécurité, publication, appareils des utilisateurs.
+/relay/                         @LoickAmg
+/scripts/android-patch.mjs      @LoickAmg
+/src-tauri/tauri.conf.json      @LoickAmg
+/.github/                       @LoickAmg
