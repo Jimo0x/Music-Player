@@ -564,7 +564,13 @@ fn scan_folders(roots: &[PathBuf], previous: &[Track], on_progress: impl Fn(usiz
             });
             let track = match unchanged {
                 Some(t) => Some((*t).clone()),
-                None => read_track_with_folder_cover(path, folder_has_cover),
+                // Fichier piégé qui fait paniquer un lecteur d'étiquettes : signalé abîmé, au
+                // lieu de faire tomber tout le scan (qui restait alors bloqué à l'écran).
+                None => std::panic::catch_unwind(|| read_track_with_folder_cover(path, folder_has_cover)).unwrap_or_else(|_| {
+                    let mut track = track_from_probe(path);
+                    track.damage = Some("Fichier abîmé ou format non reconnu".into());
+                    Some(track)
+                }),
             };
             let n = done.fetch_add(1, Ordering::Relaxed) + 1;
             if n.is_multiple_of(64) || n == total {

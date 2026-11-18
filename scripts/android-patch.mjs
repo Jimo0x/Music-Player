@@ -258,6 +258,16 @@ ${edgeToEdge ? "    enableEdgeToEdge()\n" : ""}    super.onCreate(savedInstanceS
     if (ProchesWatch.prefs(this).getBoolean("instant", false)) ProchesService.start(this)
   }
 
+  override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    // Accès à la musique accordé après l'ouverture : la bibliothèque est relue. Un premier
+    // scan lancé avant la réponse (ou pendant la boîte de dialogue) restait sinon vide.
+    if (requestCode == 1 && grantResults.any { it == PackageManager.PERMISSION_GRANTED }) {
+      main.removeCallbacks(notifyLibrary)
+      main.postDelayed(notifyLibrary, 500)
+    }
+  }
+
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     handleOpenIntent(intent)

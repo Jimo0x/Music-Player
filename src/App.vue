@@ -433,13 +433,16 @@ onBeforeUnmount(() => {
           :class="{ home: !library.root || ui.route.name === 'recent', ambient: !!player.currentTrack }"
         >
           <MobileTop v-if="ui.isMobile" />
-          <div v-if="!library.root" class="welcome">
+          <!-- Premier scan (aucun dossier encore enregistré) : l'avancement s'affiche tout de
+               suite, au lieu de laisser « Bienvenue » à l'écran sans signe de vie. -->
+          <div v-if="!library.root && !library.scanning" class="welcome">
             <img class="welcome-art" src="/logo.png" alt="" />
             <h1>Bienvenue</h1>
             <p>Choisissez le dossier où se trouve votre musique : l'application l'analyse une fois, puis s'ouvre instantanément.</p>
             <button type="button" class="pill pill-accent" @click="library.chooseFolderAndScan()">
               <Icon name="folder" :size="15" /> {{ onAndroid ? "Analyser la musique du téléphone" : "Choisir mon dossier de musique" }}
             </button>
+            <p v-if="library.error" class="welcome-error" role="alert">{{ library.error }}</p>
           </div>
           <div v-else-if="!library.tracks.length && library.scanning" class="welcome">
             <span class="big-spinner" />
@@ -650,6 +653,11 @@ onBeforeUnmount(() => {
   gap: 10px;
   padding: 40px;
   text-align: center;
+}
+.welcome-error {
+  max-width: 420px;
+  color: var(--danger-text);
+  font-size: 13px;
 }
 .welcome h1 {
   margin: 12px 0 0;

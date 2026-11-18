@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
+import { lite } from "@/lib/perf";
 import { BANDS, useSpectrum } from "@/lib/spectrum";
 
 // Visualiseur du son joué : barres en bas de l'écran (graves au centre, en miroir), ou
@@ -14,12 +15,15 @@ let height = 0;
 let color = "#fff";
 let frame = 0;
 let idle = 0;
+/** Dernière image dessinée (mode léger : 20 images par seconde au plus). */
+let drawnAt = 0;
 let observer: ResizeObserver | null = null;
 
 function resize() {
   const el = canvas.value;
   if (!el) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // Mode léger : toile à la densité de base (quatre fois moins de pixels sur un écran x2).
+  const dpr = lite.value ? 1 : Math.min(window.devicePixelRatio || 1, 2);
   width = el.clientWidth;
   height = el.clientHeight;
   el.width = Math.round(width * dpr);
@@ -73,10 +77,16 @@ function drawRing(c: CanvasRenderingContext2D) {
   }
 }
 
-function draw() {
+function draw(t: number) {
   frame = requestAnimationFrame(draw);
   const c = ctx;
   if (!c || !width) return;
+  // Téléphones modestes : moins d'images et pas de halo (le flou de l'ombre est recalculé à
+  // chaque trait, c'était le dessin le plus coûteux de l'écran « À l'écoute »).
+  if (lite.value) {
+    if (t - drawnAt < 50) return;
+    drawnAt = t;
+  }
   let total = 0;
   for (let i = 0; i < BANDS; i++) total += levels[i];
   // Silence (pause) : une dernière image vide, puis plus rien à dessiner.
@@ -87,7 +97,7 @@ function draw() {
   c.fillStyle = color;
   c.strokeStyle = color;
   c.shadowColor = color;
-  c.shadowBlur = 12;
+  c.shadowBlur = lite.value ? 0 : 12;
   if (props.shape === "ring") drawRing(c);
   else drawBars(c);
 }

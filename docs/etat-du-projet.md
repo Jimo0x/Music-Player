@@ -29,6 +29,21 @@ version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
   - **Avancement d'un envoi dans la discussion** : %, Mo envoyés sur le total, temps restant
     et débit (calcul commun avec la section Partage : `src/lib/pace.ts`).
 
+### Retours d'un testeur (Redmi 13C, version 0.7.1), traités le 18/11
+
+- **Premier scan bloqué** à l'installation (contourné en installant une ancienne version,
+  puis en mettant à jour). Cause exacte non reproduite (pas d'appareil). Corrigé ce qui
+  pouvait l'expliquer : l'avancement s'affiche dès le premier scan (« Bienvenue » restait à
+  l'écran sans signe de vie) ; un fichier qui fait paniquer la lecture des étiquettes est
+  marqué abîmé au lieu de faire tomber le scan ; le drapeau « scan en cours » est toujours
+  remis à zéro ; accès à la musique accordé après coup → bibliothèque relue. **À vérifier**
+  avec une installation neuve sur un téléphone.
+- **Saccades** : le mode léger (automatique sur Mali-G52) ne touchait pas au visualiseur ;
+  en mode léger il dessine maintenant 20 images/s, sans halo, à densité 1.
+- **« Plus de morceaux » en fin de file** : propositions (réécouter, dans la même veine,
+  plus écoutés, titres aimés, playlists, à redécouvrir) dans « À l'écoute » et dans « À
+  suivre » (là, ajout à la suite du dernier morceau). Pas dans le mode baladeur.
+
 ### Vérifications sur de vrais appareils (rien de tout cela n'a été essayé sur téléphone)
 
 - CSP sur Android (vérifiée sur PC dans la vraie appli : écrans, pochettes, polices, relais).

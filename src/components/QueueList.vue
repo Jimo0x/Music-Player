@@ -5,6 +5,7 @@ import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
 import { useUiStore } from "@/stores/ui";
 import Artwork from "./Artwork.vue";
+import EndOfQueue from "./EndOfQueue.vue";
 import Icon from "./Icon.vue";
 
 // File d'attente : le morceau en cours et les suivants (panneau sur ordinateur, « À l'écoute »).
@@ -40,7 +41,11 @@ const remaining = computed(() => {
     <p class="q-title">
       À suivre <span class="count">{{ remaining }}</span>
     </p>
-    <p v-if="!upNext.length" class="q-empty">Rien d'autre dans la file.</p>
+    <template v-if="!upNext.length">
+      <p class="q-empty">Rien d'autre dans la file.</p>
+      <!-- Pendant le dernier morceau : ajouter à la suite ; file finie : lancer directement. -->
+      <EndOfQueue v-if="library.tracks.length" class="q-next" compact :mode="player.currentTrack ? 'enqueue' : 'play'" />
+    </template>
     <div
       v-for="entry in upNext"
       :key="`${entry.index}-${entry.track!.id}`"
@@ -75,6 +80,9 @@ const remaining = computed(() => {
   margin-left: 4px;
   color: var(--text-3);
   font-weight: 500;
+}
+.q-next {
+  margin-top: var(--space-3);
 }
 .q-empty {
   margin: 0 8px;

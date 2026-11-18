@@ -24,6 +24,8 @@ export const usePlayerStore = defineStore("player", {
     repeat: "off" as RepeatMode,
     error: null as string | null,
     busy: false,
+    /** File arrivée au bout toute seule : dernier morceau et file finie (propositions). */
+    ended: null as { last: Track; queueIds: string[] } | null,
   }),
   getters: {
     /** Position estimée entre deux sondages (utile pour synchroniser les paroles). */
@@ -78,6 +80,9 @@ export const usePlayerStore = defineStore("player", {
       this.repeat = q.repeat;
     },
     async afterTrackChange(track: Track | null) {
+      // Plus de morceau après celui qui jouait : on garde de quoi proposer la suite.
+      if (track === null && this.currentTrack) this.ended = { last: this.currentTrack, queueIds: [...this.queueIds] };
+      else if (track) this.ended = null;
       this.currentTrack = track;
       this.setPosition(0);
       this.isPaused = track === null;
@@ -220,6 +225,8 @@ export const usePlayerStore = defineStore("player", {
       try {
         await api.stopPlayback();
         await this.afterTrackChange(null);
+        // Fermé à la main : pas de propositions de suite.
+        this.ended = null;
       } catch (e) {
         this.error = String(e);
       }

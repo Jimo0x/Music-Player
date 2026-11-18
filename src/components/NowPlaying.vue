@@ -12,6 +12,7 @@ import { useUiStore } from "@/stores/ui";
 import Artwork from "./Artwork.vue";
 import Icon from "./Icon.vue";
 import LyricsView from "./LyricsView.vue";
+import EndOfQueue from "./EndOfQueue.vue";
 import QueueList from "./QueueList.vue";
 import CdCase from "./CdCase.vue";
 import SeekBar from "./SeekBar.vue";
@@ -218,7 +219,11 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
         <LyricsView large />
       </div>
     </div>
-    <div v-else class="empty">Aucun morceau en cours.</div>
+    <div v-else class="empty">
+      <!-- File finie toute seule : des propositions plutôt qu'un écran vide. -->
+      <EndOfQueue v-if="player.ended && library.tracks.length" />
+      <template v-else>Aucun morceau en cours.</template>
+    </div>
 
     <div v-if="showQueue" class="queue-sheet" role="dialog" aria-label="À suivre" @click.self="showQueue = false">
       <div class="queue-card">

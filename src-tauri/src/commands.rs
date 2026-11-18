@@ -99,6 +99,15 @@ pub fn run_scan(app: &AppHandle, root: &str) -> Result<Vec<Track>, String> {
     if state.scanning.swap(true, Ordering::SeqCst) {
         return Err("Un scan de la bibliothèque est déjà en cours.".to_string());
     }
+    // Quoi qu'il arrive (même une panique), le scan est noté fini : sinon l'appli refusait
+    // tout nouveau scan jusqu'à sa fermeture.
+    struct ScanDone<'a>(&'a std::sync::atomic::AtomicBool);
+    impl Drop for ScanDone<'_> {
+        fn drop(&mut self) {
+            self.0.store(false, Ordering::SeqCst);
+        }
+    }
+    let done_guard = ScanDone(&state.scanning);
     let _ = app.emit("scan-progress", ScanProgress { done: 0, total: 0 });
     // Même dossier : les morceaux déjà connus et inchangés ne sont pas relus.
     let previous = if state.library_root.locked().as_deref() == Some(root) {
@@ -114,7 +123,7 @@ pub fn run_scan(app: &AppHandle, root: &str) -> Result<Vec<Track>, String> {
     *state.library.locked() = tracks.clone();
     *state.library_root.locked() = Some(root.to_string());
     let _ = library::save_cache(&state.library_cache_path(), root, &tracks);
-    state.scanning.store(false, Ordering::SeqCst);
+    drop(done_guard);
     let _ = app.emit("library-updated", &tracks);
     Ok(tracks)
 }
