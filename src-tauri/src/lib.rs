@@ -18,6 +18,7 @@ pub mod playlists;
 pub mod power;
 pub mod queue;
 pub mod remote;
+pub mod sealed;
 pub mod session;
 pub mod sharing;
 pub mod spectrum;

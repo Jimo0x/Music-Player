@@ -13,8 +13,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
+use base64::engine::general_purpose::STANDARD as B64;
+use base64::Engine;
 use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
 use serde::{Deserialize, Serialize};
+use spake2::{Ed25519Group, Identity, Password, Spake2};
+
+use crate::sealed::{self, OpenReader, SealWriter};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::state::AppState;
@@ -36,6 +41,28 @@ pub struct Peer {
     /// Code d'ami (Proches), quand l'appareil l'a activé : « Ajouter » sans le saisir.
     #[serde(default)]
     pub code: Option<String>,
+}
+
+/// Chiffrement (version 2) : échange de clé SPAKE2 en clair au début de la connexion, puis tout
+/// le reste (offre, réponse, archive, fin) en trames chiffrées et authentifiées. Sans code à
+/// saisir, le mot de passe est public : l'échange protège de l'écoute sur le Wi-Fi, pas d'un
+/// appareil qui se placerait activement au milieu (l'accord avant réception reste demandé).
+const KEY_PASSWORD: &[u8] = b"music-player/proximite";
+const KEY_IDENTITY: &[u8] = b"music-player/proximite/v2";
+
+#[derive(Serialize, Deserialize)]
+struct KeyLine {
+    v: u32,
+    cle: String,
+}
+
+fn spake() -> (Spake2<Ed25519Group>, Vec<u8>) {
+    Spake2::<Ed25519Group>::start_symmetric(&Password::new(KEY_PASSWORD), &Identity::new(KEY_IDENTITY))
+}
+
+fn finish_key(state: Spake2<Ed25519Group>, line: &KeyLine) -> Result<Vec<u8>, String> {
+    let inbound = B64.decode(line.cle.as_bytes()).map_err(|_| "Échange de clé illisible.".to_string())?;
+    state.finish(&inbound).map_err(|_| "Échange de clé refusé.".to_string())
 }
 
 #[derive(Serialize, Deserialize)]
@@ -108,8 +135,23 @@ fn send_once(
         s.set_read_timeout(Some(DECISION + Duration::from_secs(10)))
     };
     setup(&stream).map_err(|e| lost(e.to_string()))?;
-    let mut reader = BufReader::new(stream.try_clone().map_err(|e| lost(e.to_string()))?);
-    let mut writer = stream;
+    let mut plain_reader = BufReader::new(stream.try_clone().map_err(|e| lost(e.to_string()))?);
+    let mut plain_writer = stream;
+    // Échange de clé, puis tout est chiffré. Un appareil resté en 0.7.1 ou avant ne le
+    // comprend pas et coupe la liaison : on le dit clairement.
+    let (state, outbound) = spake();
+    write_line(&mut plain_writer, &KeyLine { v: 2, cle: B64.encode(outbound) }).map_err(lost)?;
+    let reply: KeyLine = read_line(&mut plain_reader, 4096).map_err(|e| {
+        if !*accepted && e.contains("déconnecté") {
+            Failure::Final("L'autre appareil a une ancienne version de Music Player : mettez-le à jour pour recevoir.".into())
+        } else {
+            lost(e)
+        }
+    })?;
+    let secret = finish_key(state, &reply).map_err(Failure::Final)?;
+    let (seal, open) = sealed::ciphers(&secret, true).map_err(Failure::Final)?;
+    let mut reader = BufReader::new(OpenReader::new(plain_reader, open));
+    let mut writer = SealWriter::new(plain_writer, seal);
     write_line(&mut writer, &Hello { v: 1, offre: offer.clone() }).map_err(lost)?;
     if !*accepted {
         progress("attente", 0, offer.size);
@@ -179,9 +221,30 @@ pub fn serve(
 ) -> Result<Option<(Offer, std::path::PathBuf)>, String> {
     stream.set_read_timeout(Some(Duration::from_secs(15))).map_err(|e| e.to_string())?;
     stream.set_write_timeout(Some(Duration::from_secs(60))).map_err(|e| e.to_string())?;
-    let mut reader = BufReader::new(stream.try_clone().map_err(|e| e.to_string())?);
-    let mut writer = stream;
-    let hello: Hello = read_line(&mut reader, 16 * 1024)?;
+    let control = stream.try_clone().map_err(|e| e.to_string())?;
+    let mut plain_reader = BufReader::new(stream.try_clone().map_err(|e| e.to_string())?);
+    let mut plain_writer = stream;
+    let first: serde_json::Value = read_line(&mut plain_reader, 16 * 1024)?;
+    let (mut reader, mut writer, hello): (Box<dyn BufRead + Send>, Box<dyn Write + Send>, Hello) =
+        match first.get("v").and_then(serde_json::Value::as_u64) {
+            // Envoi chiffré : réponse à l'échange de clé, puis l'offre arrive chiffrée.
+            Some(2) => {
+                let line: KeyLine = serde_json::from_value(first).map_err(|_| "Échange de clé illisible.".to_string())?;
+                let (state, outbound) = spake();
+                write_line(&mut plain_writer, &KeyLine { v: 2, cle: B64.encode(outbound) })?;
+                let secret = finish_key(state, &line)?;
+                let (seal, open) = sealed::ciphers(&secret, false)?;
+                let mut reader = BufReader::new(OpenReader::new(plain_reader, open));
+                let hello: Hello = read_line(&mut reader, 16 * 1024)?;
+                (Box::new(reader), Box::new(SealWriter::new(plain_writer, seal)), hello)
+            }
+            // Expéditeur resté en 0.7.1 ou avant : envoi en clair, toujours accepté à la réception.
+            Some(1) => {
+                let hello: Hello = serde_json::from_value(first).map_err(|_| "Message illisible.".to_string())?;
+                (Box::new(plain_reader), Box::new(plain_writer), hello)
+            }
+            _ => return Err("Version de Music Player trop différente.".into()),
+        };
     if hello.v != 1 {
         return Err("Version de Music Player trop différente.".into());
     }
@@ -203,7 +266,7 @@ pub fn serve(
     .map_err(|e| e.to_string())?;
     std::io::Seek::seek(&mut out, std::io::SeekFrom::Start(from)).map_err(|e| e.to_string())?;
     write_line(&mut writer, &Answer { reponse: "oui".into(), depuis: from })?;
-    writer.set_read_timeout(Some(Duration::from_secs(60))).map_err(|e| e.to_string())?;
+    control.set_read_timeout(Some(Duration::from_secs(60))).map_err(|e| e.to_string())?;
     progress(from, offer.size);
     transfer::copy_exact(&mut reader, &mut out, offer.size - from, cancel, |done| progress(from + done, offer.size))?;
     out.flush().map_err(|e| e.to_string())?;
@@ -557,6 +620,31 @@ mod tests {
         assert_eq!(receiving.join().unwrap().unwrap().map(|(o, _)| o), Some(offer(content.len() as u64)));
         assert_eq!(stages, vec!["attente", "envoi"]);
         assert_eq!(std::fs::read(dest).unwrap(), content);
+    }
+
+    #[test]
+    fn an_old_unencrypted_sender_is_still_received() {
+        // Expéditeur resté en 0.7.1 : offre et archive en clair, sans échange de clé.
+        let dir = tempfile::tempdir().unwrap();
+        let (listener, address) = pair();
+        let dest = dir.path().join("recu.mpshare");
+        let receiving = {
+            let dest = dest.clone();
+            std::thread::spawn(move || {
+                let (stream, _) = listener.accept().unwrap();
+                serve(stream, |_| Decision::Accept { dest, from: 0 }, &AtomicBool::new(false), |_, _| {})
+            })
+        };
+        let mut stream = TcpStream::connect(&address).unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        write_line(&mut stream, &Hello { v: 1, offre: offer(7) }).unwrap();
+        let answer: Answer = read_line(&mut reader, 4096).unwrap();
+        assert_eq!(answer.reponse, "oui");
+        stream.write_all(b"contenu").unwrap();
+        let done: Done = read_line(&mut reader, 4096).unwrap();
+        assert_eq!(done.fin, "ok");
+        assert!(receiving.join().unwrap().unwrap().is_some());
+        assert_eq!(std::fs::read(dest).unwrap(), b"contenu");
     }
 
     #[test]
