@@ -58,6 +58,16 @@ const SECRET = "a".repeat(64);
 const post = (action: string, body: unknown) => relay.post(CODE, action, body);
 const stored = () => relay.storage(CODE).map;
 
+/** Ancien compte (0.5.13 et avant) tel que le relais le garde encore : empreinte du mot de passe
+ *  et sauvegarde chiffrée. Le relais ne sait plus en créer : il est déposé directement. */
+async function seedOldAccount(cle: string, data: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(cle));
+  const map = stored();
+  map.set("compte", [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join(""));
+  map.set("sauvegarde:0", data);
+  map.set("sauvegarde", { total: 1, at: Date.now() });
+}
+
 function track(id: string, title: string): Track {
   return { id, path: `/m/${id}.mp3`, title, artist: "Artiste", album: "Album", album_artist: "Artiste", track_no: null, disc_no: null, year: null, genre: null, duration_secs: 200, has_cover: false, added_secs: 0 };
 }
@@ -77,7 +87,6 @@ beforeEach(async () => {
 
 describe("mise à jour depuis l'ancien compte", () => {
   async function oldAccount(key: string, cle: string) {
-    await post("compte", { secret: SECRET, cle });
     const backup = {
       format: "music-player-sauvegarde",
       playlists: [{ name: "Soir", theme: "ocean", style: null, tracks: [{ title: "Redo", artist: "Artiste", album: "Album", duration: 200 }] }],
@@ -85,7 +94,7 @@ describe("mise à jour depuis l'ancien compte", () => {
       listens: [],
       prefs: { "mp:proches": JSON.stringify({ me: { code: CODE, secret: SECRET }, enabled: true, friends: [] }) },
     };
-    await post("envoyer", { cle, n: 0, total: 1, data: await encrypt(key, JSON.stringify(backup)) });
+    await seedOldAccount(cle, await encrypt(key, JSON.stringify(backup)));
     localStorage.setItem("mp:compte", JSON.stringify({ code: CODE, keys: { cle, key }, lastUpload: 0 }));
   }
 
@@ -154,7 +163,6 @@ describe("mise à jour depuis l'ancien compte", () => {
 describe("ancien compte sur un appareil au profil Proches différent", () => {
   async function account(key: string) {
     const cle = "c".repeat(64);
-    await post("compte", { secret: SECRET, cle });
     const backup = {
       format: "music-player-sauvegarde",
       playlists: [{ name: "Soir", theme: "ocean", style: null, tracks: [{ title: "Redo", artist: "Artiste", album: "Album", duration: 200 }] }],
@@ -162,7 +170,7 @@ describe("ancien compte sur un appareil au profil Proches différent", () => {
       listens: [],
       prefs: { "mp:proches": JSON.stringify({ me: { code: CODE, secret: SECRET }, enabled: true, friends: [] }) },
     };
-    await post("envoyer", { cle, n: 0, total: 1, data: await encrypt(key, JSON.stringify(backup)) });
+    await seedOldAccount(cle, await encrypt(key, JSON.stringify(backup)));
     localStorage.setItem("mp:compte", JSON.stringify({ code: CODE, keys: { cle, key }, lastUpload: 0 }));
   }
 

@@ -51,8 +51,8 @@ const MAX_FRIENDS = 200;
 // Une playlist jointe à un mot (300 morceaux décrits au plus) tient dans cette limite.
 const MAX_BODY = 96 * 1024;
 
-// Compte (sauvegarde en ligne) : sauvegarde chiffrée sur l'appareil (le relais ne voit ni le
-// mot de passe ni le contenu), découpée en morceaux de 1 Mo au plus, 20 Mo en tout.
+// Ancien compte (sauvegarde en ligne, abandonné en 0.5.14) : seulement relu pour la migration
+// puis effacé ; morceaux de 1 Mo au plus, 20 Mo en tout (aussi pour l'état des appareils liés).
 const ACCOUNT_KEY = /^[0-9a-f]{64}$/;
 const CHUNK_MAX = 1024 * 1024;
 const MAX_CHUNKS = 20;
@@ -530,43 +530,8 @@ export class Profil {
         if (inbox.length) await storage.put("boite", []);
         return json({ messages: inbox });
       }
-      // Compte : création ou nouveau mot de passe (par l'appareil propriétaire du profil).
-      // `cle` : empreinte tirée du mot de passe sur l'appareil, qui prouve qu'on le connaît.
-      case "compte": {
-        if (!(await this.owner(body.secret)) || !ACCOUNT_KEY.test(body.cle ?? "")) return json({ erreur: "Refusé" }, 403);
-        await storage.put("compte", await sha256(body.cle));
-        return json({ ok: true });
-      }
-      // Envoi d'une sauvegarde chiffrée, morceau par morceau (`n` sur `total`).
-      case "envoyer": {
-        if (!(await this.accountOk(body.cle, true))) return json({ erreur: "Code ou mot de passe incorrect" }, 403);
-        const n = Number(body.n);
-        const total = Number(body.total);
-        if (!Number.isInteger(total) || total < 1 || total > MAX_CHUNKS || !Number.isInteger(n) || n < 0 || n >= total) {
-          return json({ erreur: "Sauvegarde trop volumineuse" }, 400);
-        }
-        if (typeof body.data !== "string" || body.data.length > CHUNK_MAX || !/^[A-Za-z0-9+/=]*$/.test(body.data)) {
-          return json({ erreur: "Morceau invalide" }, 400);
-        }
-        await storage.put(`envoi:${n}`, body.data);
-        // Dernier morceau : la nouvelle sauvegarde remplace l'ancienne d'un coup.
-        if (n === total - 1) {
-          const parts = [];
-          for (let i = 0; i < total; i++) {
-            const part = await storage.get(`envoi:${i}`);
-            if (typeof part !== "string") return json({ erreur: "Morceau manquant, recommencez l'envoi" }, 400);
-            parts.push(part);
-          }
-          for (let i = 0; i < total; i++) {
-            await storage.put(`sauvegarde:${i}`, parts[i]);
-            await storage.delete(`envoi:${i}`);
-          }
-          const previous = (await storage.get("sauvegarde")) ?? { total: 0 };
-          for (let i = total; i < previous.total; i++) await storage.delete(`sauvegarde:${i}`);
-          await storage.put("sauvegarde", { total, at: Date.now() });
-        }
-        return json({ ok: true });
-      }
+      // Compte en ligne abandonné en 0.5.14 : plus de création ni d'envoi de sauvegarde.
+      // Restent la lecture (migration d'un ancien compte vers les appareils liés) et l'effacement.
       // Récupération (autre appareil) : morceau `n` et description de la sauvegarde.
       case "recuperer": {
         if (!(await this.accountOk(body.cle, true))) return json({ erreur: "Code ou mot de passe incorrect" }, 403);
