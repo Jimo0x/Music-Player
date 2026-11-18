@@ -128,10 +128,11 @@ pub fn is_dolby_mp4(path: &Path) -> bool {
     file.read_to_end(&mut tail).is_ok() && found(&tail)
 }
 
-/// Pourquoi un son Dolby ne se lit pas ici (téléphone, ou ordinateur sans ffmpeg).
+/// Pourquoi un son Dolby ne se lit pas ici : variante refusée par le décodeur intégré
+/// (dolby.rs), sur téléphone ou sur un ordinateur sans ffmpeg.
 pub fn dolby_message() -> String {
     if cfg!(target_os = "android") {
-        "son Dolby (AC-3 / E-AC-3, souvent en 5.1), que les téléphones ne savent pas lire.          Convertissez-le en AAC sur l'ordinateur."
+        "son Dolby dans une variante que le téléphone ne sait pas lire. Convertissez-le en AAC          sur l'ordinateur."
             .into()
     } else {
         "son Dolby (AC-3 / E-AC-3) : installez ffmpeg pour le lire (Windows : winget install ffmpeg).".into()

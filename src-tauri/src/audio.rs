@@ -235,10 +235,19 @@ pub fn open_decoder(path: &str) -> Result<BoxedSource, String> {
             .unwrap_or_else(|_| Err("le décodeur intégré a échoué sur ce fichier".to_string()));
         match direct {
             Ok(decoder) => return Ok(decoder),
-            // Dolby dans un .m4a, sans ffmpeg (téléphone) : la vraie raison plutôt qu'« format
-            // non reconnu ».
-            Err(_) if ffmpeg::is_dolby_mp4(file_path) && !ffmpeg::ffmpeg_available() => return Err(ffmpeg::dolby_message()),
+            Err(_) if crate::dolby::is_dolby(file_path) => {}
             Err(error) if !opus::is_opus(file_path) && !ffmpeg::ffmpeg_available() => return Err(error),
+            Err(_) => {}
+        }
+    }
+    // Dolby (AC-3, E-AC-3) : décodé ici, sans ffmpeg (absent d'Android). Sous panique ou échec,
+    // ffmpeg s'il existe, sinon la raison.
+    if crate::dolby::is_dolby(file_path) {
+        let decoded = panic::catch_unwind(|| crate::dolby::DolbySource::open(file_path))
+            .unwrap_or_else(|_| Err("décodeur Dolby en échec".to_string()));
+        match decoded {
+            Ok(source) => return Ok(Box::new(source)),
+            Err(error) if !ffmpeg::ffmpeg_available() => return Err(format!("{error} ; {}", ffmpeg::dolby_message())),
             Err(_) => {}
         }
     }

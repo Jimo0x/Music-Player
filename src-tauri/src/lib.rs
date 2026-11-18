@@ -2,6 +2,7 @@ pub mod align;
 pub mod appearance;
 pub mod audio;
 pub mod commands;
+pub mod dolby;
 pub mod default_app;
 pub mod duplicates;
 pub mod eq;

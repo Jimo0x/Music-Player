@@ -1,21 +1,22 @@
-//! Commandes multimédias du système, sous Windows : morceau en cours (titre, artiste,
-//! pochette), lecture/pause, suivant, précédent et position, sur l'écran verrouillé, dans le
-//! volet du volume et avec les touches multimédias du clavier.
+//! Commandes multimédias du système, sous Windows et Linux : morceau en cours (titre,
+//! artiste, pochette), lecture/pause, suivant, précédent et position, sur l'écran verrouillé,
+//! dans le volet du volume (Windows), le panneau multimédia du bureau (KDE Plasma, GNOME : MPRIS)
+//! et avec les touches multimédias du clavier.
 //!
 //! Même principe que la session média d'Android : l'interface publie le morceau
 //! (`media_update`, `media_clear`) et les commandes reviennent par l'événement
 //! `media-command`, traité par le même code que celles du téléphone (`androidMedia.ts`).
-//! Ailleurs (macOS, Linux, Android), les deux commandes ne font rien.
+//! Ailleurs (macOS, Android), les deux commandes ne font rien.
 
 use serde::Deserialize;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 use serde::Serialize;
 use tauri::State;
 
 /// Morceau publié par l'interface.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg_attr(not(windows), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
 pub struct NowPlaying {
     pub title: String,
     pub artist: String,
@@ -27,7 +28,7 @@ pub struct NowPlaying {
     pub cover: String,
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 #[derive(Clone, Serialize)]
 struct MediaCommand {
     command: &'static str,
@@ -37,11 +38,11 @@ struct MediaCommand {
 
 #[derive(Default)]
 pub struct SystemMedia {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     controls: std::sync::Mutex<Option<souvlaki::MediaControls>>,
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 fn command_of(event: souvlaki::MediaControlEvent) -> Option<MediaCommand> {
     use souvlaki::{MediaControlEvent as E, SeekDirection};
     const STEP_MS: f64 = 10_000.0;
@@ -62,16 +63,34 @@ fn command_of(event: souvlaki::MediaControlEvent) -> Option<MediaCommand> {
 
 impl SystemMedia {
     /// Branche les commandes du système sur la fenêtre principale. Un échec (vieux Windows,
-    /// service absent) laisse simplement l'appli sans ces commandes.
-    #[cfg(windows)]
+    /// bureau Linux sans bus de session) laisse simplement l'appli sans ces commandes.
+    #[cfg(any(windows, target_os = "linux"))]
     pub fn attach(&self, app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
         use crate::state::Locked;
         use tauri::Emitter;
-        let Ok(hwnd) = window.hwnd() else { return };
+        // Windows : les commandes sont rattachées à la fenêtre. Linux : service MPRIS
+        // « org.mpris.MediaPlayer2.music_player » sur le bus de session.
+        #[cfg(windows)]
+        let hwnd = match window.hwnd() {
+            Ok(h) => Some(h.0),
+            Err(_) => return,
+        };
+        #[cfg(not(windows))]
+        let hwnd = {
+            let _ = window;
+            // Sans bus de session (serveur, conteneur), souvlaki échouerait dans son propre fil :
+            // on n'essaie même pas.
+            let bus = std::env::var_os("DBUS_SESSION_BUS_ADDRESS").is_some()
+                || std::env::var_os("XDG_RUNTIME_DIR").is_some_and(|dir| std::path::Path::new(&dir).join("bus").exists());
+            if !bus {
+                return;
+            }
+            None
+        };
         let config = souvlaki::PlatformConfig {
             display_name: "Music Player",
             dbus_name: "music_player",
-            hwnd: Some(hwnd.0),
+            hwnd,
         };
         let Ok(mut controls) = souvlaki::MediaControls::new(config) else { return };
         let app = app.clone();
@@ -85,13 +104,13 @@ impl SystemMedia {
         }
     }
 
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "linux")))]
     pub fn attach(&self, _app: &tauri::AppHandle, _window: &tauri::WebviewWindow) {}
 }
 
 #[tauri::command]
 pub fn media_update(media: State<SystemMedia>, info: NowPlaying) {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     {
         use crate::state::Locked;
         use std::time::Duration;
@@ -112,24 +131,24 @@ pub fn media_update(media: State<SystemMedia>, info: NowPlaying) {
             souvlaki::MediaPlayback::Paused { progress }
         });
     }
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "linux")))]
     let _ = (media, info);
 }
 
 #[tauri::command]
 pub fn media_clear(media: State<SystemMedia>) {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     {
         use crate::state::Locked;
         if let Some(controls) = media.controls.locked().as_mut() {
             let _ = controls.set_playback(souvlaki::MediaPlayback::Stopped);
         }
     }
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "linux")))]
     let _ = media;
 }
 
-#[cfg(all(test, windows))]
+#[cfg(all(test, any(windows, target_os = "linux")))]
 mod tests {
     use super::*;
     use souvlaki::{MediaControlEvent as E, MediaPosition, SeekDirection};

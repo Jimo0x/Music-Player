@@ -104,6 +104,13 @@ fn resolve_runner(cancel: &AtomicBool) -> Result<Runner, JobError> {
 
 /// Une seule recherche YouTube, le meilleur résultat (`ytsearch1:`).
 fn make_query(wanted: &Wanted) -> Result<String, JobError> {
+    // Lien direct : passé tel quel (après « -- », il ne peut pas être pris pour une option).
+    if wanted.url.is_some() {
+        return wanted
+            .direct_url()
+            .map(str::to_owned)
+            .ok_or_else(|| JobError::Failed("Ce lien n'est pas une adresse web valable (http ou https).".to_owned()));
+    }
     super::spotdl::make_query(wanted).map(|search| format!("ytsearch1:{search}"))
 }
 
@@ -199,6 +206,17 @@ fn classify_failure(stdout: &str, stderr: &str) -> JobError {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_direct_link_is_downloaded_as_is_and_bad_links_are_refused() {
+        let mut w = wanted("", "");
+        w.url = Some(" https://www.youtube.com/watch?v=abc123 ".to_owned());
+        assert_eq!(make_query(&w).expect("lien"), "https://www.youtube.com/watch?v=abc123");
+        for bad in ["--exec calc", "file:///etc/passwd", "https://a b", "javascript:alert(1)"] {
+            w.url = Some(bad.to_owned());
+            assert!(make_query(&w).is_err(), "{bad}");
+        }
+    }
     use std::sync::atomic::AtomicBool;
 
     use super::{classify_failure, make_query, YtDlpSource, OUTPUT_TEMPLATE};
@@ -206,7 +224,7 @@ mod tests {
     use crate::fetch::{JobError, Wanted};
 
     fn wanted(title: &str, artist: &str) -> Wanted {
-        Wanted { title: title.to_owned(), artist: artist.to_owned(), album: String::new(), duration_secs: Some(180.0), playlist_id: None }
+        Wanted { title: title.to_owned(), artist: artist.to_owned(), album: String::new(), duration_secs: Some(180.0), playlist_id: None, url: None }
     }
 
     #[test]

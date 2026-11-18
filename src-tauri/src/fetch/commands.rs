@@ -225,6 +225,10 @@ fn run_job(app: &tauri::AppHandle, wanted: &Wanted, cancel: &AtomicBool) -> Resu
         .clone()
         .ok_or_else(|| JobError::Failed("Choisissez d'abord le dossier de votre bibliothèque.".to_owned()))?;
     let root = PathBuf::from(root);
+    // Lien direct : yt-dlp seul (spotDL ne lit que des liens Spotify, résolus avant la file).
+    if wanted.url.is_some() {
+        return download_and_import(&YtDlpSource, wanted, &root, cancel);
+    }
     match download_and_import(&SpotDlSource, wanted, &root, cancel) {
         Err(JobError::NotFound | JobError::Failed(_) | JobError::ToolMissing(_)) if !cancel.load(Ordering::Relaxed) => {
             download_and_import(&YtDlpSource, wanted, &root, cancel)
@@ -282,7 +286,7 @@ mod tests {
     use crate::state::Locked;
 
     fn wanted(title: &str) -> Wanted {
-        Wanted { title: title.into(), artist: "Artiste".into(), album: String::new(), duration_secs: None, playlist_id: None }
+        Wanted { title: title.into(), artist: "Artiste".into(), album: String::new(), duration_secs: None, playlist_id: None, url: None }
     }
 
     fn track(title: &str) -> Track {

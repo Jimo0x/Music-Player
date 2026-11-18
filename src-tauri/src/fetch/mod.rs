@@ -24,6 +24,21 @@ pub struct Wanted {
     /// Playlist où ranger le morceau une fois importé.
     #[serde(default)]
     pub playlist_id: Option<String>,
+    /// Lien direct (YouTube, SoundCloud… : tout ce que yt-dlp sait lire). Sans recherche ni
+    /// comparaison avec un titre attendu : c'est le son du lien qui est importé.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+impl Wanted {
+    /// Lien direct utilisable : http(s), sans espace, de taille raisonnable.
+    pub fn direct_url(&self) -> Option<&str> {
+        let url = self.url.as_deref()?.trim();
+        let ok = (url.starts_with("https://") || url.starts_with("http://"))
+            && url.len() <= 2000
+            && !url.chars().any(|c| c.is_whitespace() || c.is_control());
+        ok.then_some(url)
+    }
 }
 
 /// État d'une tâche de la file.

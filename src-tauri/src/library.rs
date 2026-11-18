@@ -572,14 +572,6 @@ fn scan_folders(roots: &[PathBuf], previous: &[Track], on_progress: impl Fn(usiz
                     Some(track)
                 }),
             };
-            // Téléphone : les sons Dolby (pas de décodeur, pas de ffmpeg) sont signalés dès le
-            // scan, avec la raison, au lieu d'échouer un par un à la lecture.
-            let track = track.map(|mut t| {
-                if cfg!(target_os = "android") && unchanged.is_none() && t.damage.is_none() && ffmpeg::is_dolby_mp4(path) {
-                    t.damage = Some(format!("Illisible sur téléphone : {}", ffmpeg::dolby_message()));
-                }
-                t
-            });
             let n = done.fetch_add(1, Ordering::Relaxed) + 1;
             if n.is_multiple_of(64) || n == total {
                 on_progress(n, total);

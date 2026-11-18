@@ -125,7 +125,10 @@ pub(super) fn make_query(wanted: &Wanted) -> Result<String, JobError> {
 
 /// Nom du fichier rangé dans la bibliothèque : « Artiste - Titre.mp3 », nettoyé.
 pub(super) fn requested_file_name(wanted: &Wanted) -> String {
-    let raw = if wanted.artist.trim().is_empty() {
+    let raw = if wanted.title.trim().is_empty() {
+        // Lien direct sans titre connu d'avance : nom provisoire, remplacé à l'import.
+        "Téléchargement".to_owned()
+    } else if wanted.artist.trim().is_empty() {
         wanted.title.trim().to_owned()
     } else {
         format!("{} - {}", wanted.artist.trim(), wanted.title.trim())
@@ -201,7 +204,7 @@ mod tests {
     use crate::fetch::{JobError, Wanted};
 
     fn wanted(title: &str, artist: &str) -> Wanted {
-        Wanted { title: title.to_owned(), artist: artist.to_owned(), album: String::new(), duration_secs: Some(180.0), playlist_id: None }
+        Wanted { title: title.to_owned(), artist: artist.to_owned(), album: String::new(), duration_secs: Some(180.0), playlist_id: None, url: None }
     }
 
     #[test]

@@ -51,6 +51,23 @@ fn import_downloaded_file(downloaded: &Path, wanted: &Wanted, library_root: &Pat
     let candidate = library::read_track(downloaded)
         .ok_or_else(|| JobError::Failed("Le fichier téléchargé n'est pas un format audio pris en charge.".to_owned()))?;
 
+    // Lien direct : rien à comparer, le fichier garde ses étiquettes (le titre de la vidéo est
+    // nettoyé à la lecture de la bibliothèque) et prend leur nom.
+    if wanted.url.is_some() {
+        let mut named = candidate.clone();
+        library::tidy_video_title(&mut named);
+        let from_tags = Wanted { title: named.title.clone(), artist: named.artist.clone(), ..wanted.clone() };
+        let unknown = named.artist == library::UNKNOWN_ARTIST;
+        let file_name = requested_file_name(&Wanted { artist: if unknown { String::new() } else { from_tags.artist.clone() }, ..from_tags });
+        let destination = available_destination(library_root, &file_name)?;
+        fs::rename(downloaded, &destination)
+            .map_err(|error| JobError::Failed(format!("Impossible de déplacer le morceau dans la bibliothèque : {error}")))?;
+        return library::read_track(&destination).ok_or_else(|| {
+            let _ = fs::remove_file(&destination);
+            JobError::Failed("Le morceau déplacé ne peut pas être relu par la bibliothèque.".to_owned())
+        });
+    }
+
     let score = score_match(
         TrackInfo { title: &wanted.title, artist: &wanted.artist, duration_secs: wanted.duration_secs },
         TrackInfo { title: &candidate.title, artist: &candidate.artist, duration_secs: Some(candidate.duration_secs) },
@@ -141,7 +158,7 @@ mod tests {
     use crate::fetch::{JobError, Wanted};
 
     fn wanted() -> Wanted {
-        Wanted { title: "Bruxelles vie".into(), artist: "Damso".into(), album: String::new(), duration_secs: Some(200.0), playlist_id: None }
+        Wanted { title: "Bruxelles vie".into(), artist: "Damso".into(), album: String::new(), duration_secs: Some(200.0), playlist_id: None, url: None }
     }
 
     type Answer = Box<dyn Fn(&Path) -> Result<PathBuf, JobError> + Send + Sync>;
@@ -216,6 +233,7 @@ mod tests {
             album: String::new(),
             duration_secs: Some(213.0),
             playlist_id: None,
+            url: None,
         };
         let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::<Option<f32>>::new()));
         let keep = seen.clone();

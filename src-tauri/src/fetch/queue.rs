@@ -337,6 +337,7 @@ mod tests {
             album: String::new(),
             duration_secs: Some(180.0),
             playlist_id: Some("playlist-1".to_owned()),
+            url: None,
         }
     }
 

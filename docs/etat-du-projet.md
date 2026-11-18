@@ -52,13 +52,20 @@ version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
   Réglages → « Importer de Spotify… »). Le travail fait avec ChatGPT (étapes 1 à 9 du
   moteur) était bien intégré. Sur téléphone, pas de téléchargement (outils absents).
 - **Sons de The Weeknd illisibles sur le Moov Smart Pro** : 73 fichiers (Trilogy, Starboy,
-  After Hours, Kiss Land) sont en Dolby E-AC-3 5.1 dans des .m4a ; le PC les lit par ffmpeg,
-  le téléphone n'a aucun décodeur. Désormais : raison claire à la lecture, et signalés dès
-  le scan sur téléphone (liste des fichiers abîmés). Conversion en AAC : décision en attente.
-- **Écran verrouillé du PC** : commandes multimédias de Windows (souvlaki, `media_controls.rs`)
-  branchées sur le même pont que la session média d'Android. **Pas encore essayé dans la
-  vraie appli** (l'appli installée était ouverte).
-- **Écran verrouillé Android façon Apple Music** : décision en attente (limites d'Android).
+  After Hours, Kiss Land) en Dolby E-AC-3 5.1 dans des .m4a. Désormais décodés partout en Rust
+  pur (`dolby.rs`, filmcraft-ac3), au fil de la lecture, ramenés en stéréo au niveau de
+  ffmpeg, avec saut. Vérifié sur les 73 : durées exactes, son identique à ffmpeg
+  (corrélation 1,0000). **Pas encore essayé sur téléphone.**
+- **Écran verrouillé du PC** : commandes multimédias de Windows et de Linux (MPRIS : écran
+  verrouillé de KDE Plasma / CachyOS, GNOME) avec souvlaki, `media_controls.rs`, même pont que
+  la session média d'Android. Linux vérifié en conteneur (compilation, mises à jour, pas de bus
+  → rien tenté). **Pas encore essayé dans la vraie appli** (Windows ni Linux).
+- **Page « Télécharger »** (barre latérale, Réglages) : lien direct (yt-dlp, sans recherche),
+  lien Spotify (spotDL) ou « Artiste - Titre », playlist de destination, file partagée avec
+  l'import Spotify (`FetchJobs.vue`). Lien direct essayé pour de vrai (vidéo YouTube importée).
+- **En attente d'un environnement Android** (pas de SDK sur ce PC, rien d'essayable ici) :
+  lecteur plein écran sur l'écran verrouillé (option B choisie), téléchargement sur téléphone
+  (réadapter yt-dlp dans l'appli, recherche spotDL refaite par nos soins).
 - **Ensuite (demande du propriétaire)** : revue de sécurité, puis optimisation poussée, une
   fois toutes les fonctions confirmées sur appareils.
 

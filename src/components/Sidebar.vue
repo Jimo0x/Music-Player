@@ -29,6 +29,7 @@ const nav = [
   { name: "songs", label: "Morceaux", icon: "songs" },
   { name: "favorites", label: "Titres aimés", icon: "heart" },
   { name: "stats", label: "Mon écoute", icon: "stats" },
+  { name: "download", label: "Télécharger", icon: "import" },
 ] as const;
 
 const progress = computed(() => {

@@ -231,6 +231,8 @@ export interface FetchWanted {
   duration_secs?: number | null;
   /** Playlist où ranger le morceau une fois importé. */
   playlist_id?: string | null;
+  /** Lien direct (YouTube, SoundCloud…), téléchargé tel quel par yt-dlp. */
+  url?: string | null;
 }
 
 export interface FetchJob {
