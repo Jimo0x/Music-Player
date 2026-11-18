@@ -3,7 +3,9 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import type { Piece } from "@/lib/friendsApi";
 import type { Track } from "@/lib/types";
 import { LibraryMatcher, matchPlaylist } from "@/lib/spotifyImport";
-import { type ChatLine, useFriendsStore } from "@/stores/friends";
+import { formatBytes } from "@/lib/format";
+import { pace } from "@/lib/pace";
+import { type ChatLine, type ParcelProgress, useFriendsStore } from "@/stores/friends";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
 import { usePlaylistsStore } from "@/stores/playlists";
@@ -183,6 +185,12 @@ const sizeLabel = (bytes: number) => (bytes >= 1e6 ? `${(bytes / 1e6).toFixed(1)
 function incoming(p: Piece) {
   return p.type === "morceau" && p.colis ? (friends.parcels[`in:${p.colis.id}`] ?? null) : null;
 }
+/** « Envoi du son… 42 % · 1,2 Mo sur 3 Mo · ≈ 10 s restantes · 300 Ko/s » (Mo et temps dès qu'ils sont connus). */
+function sendingText(p: ParcelProgress): string {
+  if (!p.total) return "Préparation du son…";
+  const left = pace(p.done, p.total, p.rate ?? null);
+  return `Envoi du son… ${percent(p)} % · ${formatBytes(p.done)} sur ${formatBytes(p.total)}${left ? ` · ${left}` : ""}`;
+}
 const percent = (p: { done: number; total: number } | null) => (p && p.total ? Math.round((p.done / p.total) * 100) : 0);
 const outgoing = computed(() => (friend.value ? (friends.parcels[`out:${friend.value.code}`] ?? null) : null));
 async function receive(l: ChatLine) {
@@ -338,7 +346,7 @@ const liveTrack = computed(() => (live.value ? matcher.value.find({ title: live.
             <button type="button" class="icon-btn" aria-label="Retirer la pièce jointe" @click="clearPiece"><Icon name="close" :size="15" /></button>
           </div>
           <div v-if="outgoing" class="sending" role="status">
-            <span>Envoi du son… {{ percent(outgoing) }} %</span>
+            <span>{{ sendingText(outgoing) }}</span>
             <span class="bar"><span :style="{ width: `${percent(outgoing)}%` }" /></span>
           </div>
 

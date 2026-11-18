@@ -10,6 +10,9 @@ import FastScroll from "@/components/FastScroll.vue";
 import Icon from "@/components/Icon.vue";
 import TrackRow from "@/components/TrackRow.vue";
 import VirtualList from "@/components/VirtualList.vue";
+import { remembered } from "@/lib/remember";
+import { SORTS, sortTracks } from "@/lib/trackSort";
+import type { Track } from "@/lib/types";
 
 const library = useLibraryStore();
 const favorites = useFavoritesStore();
@@ -17,7 +20,18 @@ const player = usePlayerStore();
 
 // Les plus récemment aimés en premier : l'ordre n'est pas gardé côté Rust (un simple
 // ensemble), donc on retombe sur l'ordre de la bibliothèque, le plus stable disponible.
-const tracks = computed(() => library.tracks.filter((t) => favorites.isFavorite(t.id)));
+const liked = computed(() => library.tracks.filter((t) => favorites.isFavorite(t.id)));
+// Mêmes tris que les playlists, gardés d'une visite à l'autre.
+const SORT_IDS = ["perso", ...SORTS.map((s) => s.id)];
+const sortId = remembered<string>("mp:tri-favoris", "perso", SORT_IDS);
+const sort = computed(() => SORTS.find((x) => x.id === sortId.value));
+const tracks = computed(() => (sort.value ? sortTracks(liked.value, sort.value.key, sort.value.ascending) : liked.value));
+// Lettre de la barre de défilement rapide : celle du champ trié.
+function initial(t: Track | undefined): string {
+  const key = sort.value?.key;
+  const text = key === "artist" ? t?.artist : key === "album" ? t?.album : t?.title;
+  return text?.trim().charAt(0).toUpperCase() ?? "";
+}
 const ui = useUiStore();
 useSelectionPool(() => tracks.value.map((t) => t.id));
 const totalDuration = computed(() => tracks.value.reduce((s, t) => s + t.duration_secs, 0));
@@ -44,6 +58,13 @@ function play(index: number) {
         </button>
       </div>
     </div>
+    <label v-if="tracks.length > 1" class="sort">
+      <span class="muted">Trier</span>
+      <select v-model="sortId" class="fieldbox" aria-label="Trier les titres aimés">
+        <option value="perso">Ordre de la bibliothèque</option>
+        <option v-for="s in SORTS" :key="s.id" :value="s.id">{{ s.label }}</option>
+      </select>
+    </label>
     <p v-if="!tracks.length" class="empty">
       Aucun morceau aimé pour l'instant : touchez le cœur dans le menu d'un morceau (clic droit, ou « ⋯ »).
     </p>
@@ -52,7 +73,7 @@ function play(index: number) {
         <TrackRow :track="item" :index="index" striped @play="play(index)" />
       </template>
     </VirtualList>
-    <FastScroll :count="tracks.length" :label="(i) => tracks[i]?.title.trim().charAt(0).toUpperCase() ?? ''" />
+    <FastScroll :count="tracks.length" :label="(i) => initial(tracks[i])" />
   </div>
 </template>
 
@@ -67,6 +88,13 @@ function play(index: number) {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+.sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  font-size: 13px;
 }
 .empty {
   margin-top: 8px;

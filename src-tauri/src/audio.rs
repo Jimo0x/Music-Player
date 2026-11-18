@@ -235,12 +235,12 @@ pub fn open_decoder(path: &str) -> Result<BoxedSource, String> {
             .unwrap_or_else(|_| Err("le décodeur intégré a échoué sur ce fichier".to_string()));
         match direct {
             Ok(decoder) => return Ok(decoder),
-            Err(error) if !opus::is_ogg_opus(file_path) && !ffmpeg::ffmpeg_available() => return Err(error),
+            Err(error) if !opus::is_opus(file_path) && !ffmpeg::ffmpeg_available() => return Err(error),
             Err(_) => {}
         }
     }
-    // Opus : décodé ici, sans ffmpeg (absent d'Android). Sous panique ou échec, ffmpeg s'il existe.
-    if opus::is_ogg_opus(file_path) {
+    // Opus (Ogg ou MP4) : décodé ici, sans ffmpeg (absent d'Android). Sous panique ou échec, ffmpeg s'il existe.
+    if opus::is_opus(file_path) {
         let decoded = panic::catch_unwind(|| opus_decoder(file_path)).unwrap_or_else(|_| Err("décodeur Opus en échec".to_string()));
         match decoded {
             Ok(decoder) => return Ok(decoder),

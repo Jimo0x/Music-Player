@@ -17,19 +17,17 @@ version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
 
 ### Avis des utilisateurs encore ouverts
 
-- **Audiolab** : enregistrements .wav / .m4a illisibles (signalé deux fois). Essayé le
-  18/11 avec deux vrais fichiers (WAV PCM 16 bits et AAC de WhatsApp) : lus par le décodeur
-  intégré, sans ffmpeg, donc aussi sur Android. Variantes essayées : WAV 24 bits, 32 bits
-  flottant, ADPCM, 48 kHz stéréo, AAC en .m4a : toutes lues. **Seul trou trouvé** : de l'Opus
-  dans un conteneur MP4 (.m4a). Sur PC, ffmpeg prend le relais ; sur Android, ce fichier
-  reste illisible (`opus::is_ogg_opus` ne reconnaît que l'Ogg). C'est sans doute le cas
-  d'Audiolab (le message parlait d'.opus).
 - **Pochettes des playlists de Méryl** (Android 10, Chrome 114) : correction envoyée, jamais
   vérifiée sur son téléphone. Les deux autres points de son avis (saisie de la discussion
   sous le clavier, champ d'avis en pilule) sont corrigés depuis le 11/11.
-- **Tri dans Favoris** : fait dans les playlists (0.8.0), absent de Favoris.
-- **Avancement d'un envoi dans la discussion** : la section Partage montre déjà le
-  pourcentage, les Mo et le temps restant ; la discussion n'affiche que le pourcentage.
+- Corrigés le 18/11, pas encore publiés ni essayés sur téléphone (avis à marquer
+  « Traité » après publication) :
+  - **Audiolab** : WAV (16/24/32 bits, ADPCM) et AAC/.m4a étaient déjà lus sans ffmpeg ; le
+    trou était l'Opus rangé dans un .m4a, illisible sur Android. Désormais décodé par
+    `opus.rs` (paquets séparés par symphonia, en-tête « dOps » en gros-boutiste).
+  - **Tri dans Favoris** : mêmes tris que les playlists, gardés (`mp:tri-favoris`).
+  - **Avancement d'un envoi dans la discussion** : %, Mo envoyés sur le total, temps restant
+    et débit (calcul commun avec la section Partage : `src/lib/pace.ts`).
 
 ### Vérifications sur de vrais appareils (rien de tout cela n'a été essayé sur téléphone)
 

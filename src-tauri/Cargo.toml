@@ -81,3 +81,9 @@ winreg = "0.55"
 tempfile = "3"
 
 
+
+# opus-decoder 0.1.1 : décalage de bits qui déborde sur certains enregistrements Opus à bas débit
+# (celt/vq.rs, masque d'anti-effondrement). Sans effet en version publiée (pas de contrôle de
+# débordement) ; en mode test il faisait paniquer. Même comportement que la version publiée.
+[profile.dev.package.opus-decoder]
+overflow-checks = false

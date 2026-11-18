@@ -18,6 +18,7 @@ import {
 import { conversationKey, openWord, publicKey, sealWord } from "@/lib/e2e";
 import { alert } from "@/lib/alerts";
 import { api } from "@/lib/api";
+import { type RateSample, updateRate } from "@/lib/pace";
 import { PARCEL_MAX_BYTES, receiveParcel, sendParcel } from "@/lib/parcel";
 import type { Track } from "@/lib/types";
 import { useAppearanceStore } from "./appearance";
@@ -47,10 +48,17 @@ export interface ChatLine {
 }
 
 /** Avancement d'un son joint, envoyé (« out:code ») ou reçu (« in:id du colis »). */
-export interface ParcelProgress {
+export interface ParcelProgress extends Partial<RateSample> {
   done: number;
   total: number;
   error?: string | null;
+}
+
+/** Avancement d'un colis, avec le débit mesuré (pour le temps restant). */
+function parcelStep(prev: ParcelProgress | undefined, done: number, total: number): ParcelProgress {
+  const sample: RateSample = { rate: prev?.rate ?? null, sampleAt: prev?.sampleAt ?? 0, sampleDone: prev?.sampleDone ?? 0 };
+  updateRate(sample, done, true);
+  return { done, total, ...sample };
 }
 
 function loadWords(): { conversations: Record<string, ChatLine[]>; unread: Record<string, number> } {
@@ -584,7 +592,7 @@ export const useFriendsStore = defineStore("friends", {
           if (file.size > PARCEL_MAX_BYTES) throw new Error(`fichier trop lourd (${Math.round(file.size / 1e6)} Mo, ${Math.round(PARCEL_MAX_BYTES / 1e6)} Mo au plus)`);
           const who = { base: this.base, de: this.me.code, secret: this.me.secret };
           piece.colis = await sendParcel(who, file.size, (offset, len) => api.parcelRead(file.name, offset, len), (done, total) => {
-            this.parcels[key] = { done, total };
+            this.parcels[key] = parcelStep(this.parcels[key], done, total);
           });
         } catch (e) {
           warning = `Le fichier n'a pas pu être joint (${e instanceof Error ? e.message : String(e)}) : seul le titre est envoyé.`;
@@ -612,7 +620,7 @@ export const useFriendsStore = defineStore("friends", {
       const name = `colis-${ref.id}.${"mpshare"}`;
       try {
         await receiveParcel(this.base, ref, (data, append) => api.parcelWrite(name, data, append), (done, total) => {
-          this.parcels[key] = { done, total };
+          this.parcels[key] = parcelStep(this.parcels[key], done, total);
         });
         const result = await api.parcelImport(name);
         line.recu = result.track_ids;

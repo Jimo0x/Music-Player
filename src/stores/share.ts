@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { api } from "@/lib/api";
 import { alert } from "@/lib/alerts";
 import { transferNotice, transferNoticeDone } from "@/lib/androidMedia";
+import { updateRate } from "@/lib/pace";
 import { taskbarProgress } from "@/lib/taskbar";
 import { useDevicesStore } from "./devices";
 import { useLibraryStore } from "./library";
@@ -220,19 +221,7 @@ export const useShareStore = defineStore("share", {
       const t = this.byId(p.id);
       if (!t) return;
       const moving = p.stage === "envoi" || p.stage === "reception";
-      const now = performance.now();
-      if (!moving) {
-        // Attente ou reprise : la mesure repart au prochain octet transféré.
-        t.sampleAt = 0;
-      } else if (t.sampleAt === 0 || p.done < t.sampleDone) {
-        t.sampleAt = now;
-        t.sampleDone = p.done;
-      } else if (now - t.sampleAt >= 700) {
-        const instant = ((p.done - t.sampleDone) * 1000) / (now - t.sampleAt);
-        t.rate = t.rate === null ? instant : t.rate * 0.75 + instant * 0.25;
-        t.sampleAt = now;
-        t.sampleDone = p.done;
-      }
+      updateRate(t, p.done, moving);
       t.progress = { ...p, message: p.message ?? null };
       if (p.stage === "fini") this.noteSent(t);
       this.syncBackground();

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { formatBytes } from "@/lib/format";
+import { pace as paceText } from "@/lib/pace";
 import { isRunning, useShareStore, type Transfer } from "@/stores/share";
 import Icon from "./Icon.vue";
 
@@ -16,20 +17,9 @@ const percent = computed(() =>
 
 /** « ≈ 2 min · 1,2 Mo/s », d'après le débit mesuré (rien tant qu'il n'est pas fiable). */
 const pace = computed(() => {
-  const rate = props.transfer.rate;
-  if (!moving.value || rate === null || rate < 1) return "";
-  const left = Math.max(0, p.value.total - p.value.done) / rate;
-  return ` · ${remaining(left)} · ${formatBytes(rate)}/s`;
+  const text = moving.value ? paceText(p.value.done, p.value.total, props.transfer.rate) : "";
+  return text ? ` · ${text}` : "";
 });
-
-function remaining(secs: number): string {
-  if (secs < 5) return "presque fini";
-  if (secs < 60) return `≈ ${Math.ceil(secs / 5) * 5} s restantes`;
-  if (secs < 3600) return `≈ ${Math.round(secs / 60)} min restantes`;
-  const h = Math.floor(secs / 3600);
-  const m = Math.round((secs % 3600) / 60);
-  return `≈ ${h} h ${m.toString().padStart(2, "0")} restantes`;
-}
 
 const status = computed(() => {
   const t = props.transfer;
