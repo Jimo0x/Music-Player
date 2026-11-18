@@ -282,24 +282,31 @@ l'application.
 ## Structure du repo
 
 ```
-src-tauri/            Backend Rust
-  src/queue.rs         File d'attente : ordre, shuffle, répétition (logique pure, testée)
-  src/library.rs       Scan parallèle, métadonnées (lofty), cache, pochettes
-  src/lyrics.rs        Paroles : .lrc, étiquettes, LRCLIB (+ cache)
-  src/updater.rs       Mise à jour automatique (ordinateur)
-  src/playlists.rs     Playlists persistées en JSON
-  src/session.rs       Sauvegarde/restauration de session
-  src/eq.rs            Égaliseur 3 bandes (filtres biquad + Source rodio maison)
-  src/audio.rs         Thread audio dédié (rodio), piloté par messages
-  src/commands.rs       Commandes Tauri (IPC) : coordonne les modules ci-dessus
-  src/state.rs          État applicatif partagé
-src/                  Frontend Vue 3 (Vite + TypeScript)
-  stores/               Pinia (library, player, playlists, eq)
-  components/           Sidebar, TrackTable, NowPlayingBar, QueueDrawer, EqualizerPanel...
-  lib/tauriMock.ts       Mock de l'IPC Tauri, chargé UNIQUEMENT en `vite dev` hors webview
-                         (sert à faire de la QA visuelle dans un navigateur classique)
-tests/                 Tests frontend (vitest + @vue/test-utils)
+src-tauri/            Moteur Rust (Tauri 2)
+  src/audio.rs          Thread audio dédié (rodio), piloté par messages
+  src/queue.rs          File d'attente : ordre, aléatoire, répétition (logique pure, testée)
+  src/library.rs        Scan parallèle, étiquettes (lofty), cache, pochettes, titres de vidéos
+  src/lyrics.rs         Paroles : .lrc, étiquettes, LRCLIB (+ cache) ; align.rs : synchro auto
+  src/playlists.rs      Playlists en JSON ; favorites.rs, session.rs, listening.rs
+  src/sharing.rs        Archives de partage (.mpshare), découpage en parties
+  src/remote.rs         Partage par code via le relais (SPAKE2 + ChaCha20-Poly1305)
+  src/nearby.rs         Partage Wi-Fi (mDNS), chiffré par sealed.rs
+  src/fetch/            Moteur de téléchargement : file, spotDL puis yt-dlp, import, lien Spotify
+  src/bounded.rs        Programmes externes avec délai et arrêt
+  src/commands.rs       Commandes Tauri (IPC) ; state.rs : état partagé
+src/                  Interface Vue 3 + TypeScript + Pinia
+  lib/api.ts            Point d'entrée unique vers le moteur Rust (types : lib/types.ts)
+  lib/tauriMock.ts      IPC simulé pour le mode démo navigateur (absent du build)
+  stores/               player, library, playlists, lyrics, friends, sync, fetch, baladeur, ui…
+  components/, views/   Écrans et composants (Baladeur.vue, AddToPlaylists.vue, NowPlaying.vue…)
+relay/                Relais Cloudflare (Worker + Durable Objects) : partage, proches, avis
+scripts/android-patch.mjs  Complète le projet Android généré (services, permissions, Kotlin)
+docs/                 État du projet (etat-du-projet.md) et notes de conception
 ```
+
+Pour reprendre le travail : [CLAUDE.md](CLAUDE.md) (façon de travailler, publication, relais)
+et [docs/etat-du-projet.md](docs/etat-du-projet.md) (versions, reste à faire). Pour
+contribuer : [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Développement en local
 
@@ -333,21 +340,18 @@ bundle de production (tree-shaké via `import.meta.env.DEV`).
 ## Tests et lint
 
 ```bash
-npm run lint                          # eslint (frontend)
-cd src-tauri && cargo clippy --all-targets -- -D warnings   # lint Rust
+npm run lint                 # ESLint
+npx vue-tsc --noEmit         # types TypeScript
+npm test                     # tests de l'interface (Vitest, ~160)
 
-npm test                              # 23 tests frontend (vitest)
-cd src-tauri && cargo test            # 33 tests backend (queue, bibliothèque,
-                                       # playlists, session, égaliseur)
+cd src-tauri
+cargo clippy --all-targets -- -D warnings
+cargo test -- --test-threads=1   # tests du moteur (~200), un à la fois comme la CI
 ```
 
-La logique testée automatiquement est volontairement celle qui ne dépend
-d'aucun périphérique réel (file d'attente, calcul des filtres de
-l'égaliseur, persistance JSON, extraction de métadonnées sur des fichiers
-WAV générés à la volée). La lecture audio elle-même et l'interface ont été
-vérifiées manuellement : build de production, lancement du binaire compilé
-sous un display virtuel (aucun crash, dégradation propre sans carte son), et
-QA visuelle de chaque écran via le mode démo navigateur (Playwright).
+Les tests qui ont besoin du réseau ou d'outils installés (relais en ligne, spotDL, yt-dlp)
+sont marqués `#[ignore]` : `cargo test --lib -- --ignored <nom>` pour les lancer. La CI les
+exécute tous les autres sur Windows à chaque envoi.
 
 ## Build et distribution
 
