@@ -70,6 +70,13 @@ version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
 - **Ensuite (demande du propriétaire)** : revue de sécurité, puis optimisation poussée, une
   fois toutes les fonctions confirmées sur appareils.
 
+### « Quoi de neuf ? » (après la 0.9.0, pas encore publié)
+
+- Notes de chaque version dans `src/nouveautes.json` : fenêtre au premier lancement après une
+  mise à jour (versions sautées comprises), bouton dans Réglages → Mises à jour, notes de la
+  version proposée dans la fenêtre / le bandeau de mise à jour. La CI en fait le texte de la
+  version GitHub (`scripts/release-notes.mjs`) et refuse une version sans notes.
+
 ### Vérifications sur de vrais appareils (rien de tout cela n'a été essayé sur téléphone)
 
 - CSP sur Android (vérifiée sur PC dans la vraie appli : écrans, pochettes, polices, relais).

@@ -1,0 +1,43 @@
+[
+  {
+    "version": "0.9.0",
+    "date": "2026-11-18",
+    "items": [
+      "Les sons Dolby (5.1, albums « Dolby Atmos ») se lisent maintenant partout, téléphones compris.",
+      "Les enregistrements en .m4a (Audiolab et autres enregistreurs) se lisent sur téléphone.",
+      "Sur ordinateur : le morceau en cours et ses boutons sur l'écran verrouillé et avec les touches multimédias du clavier (Windows et Linux).",
+      "Nouvelle page « Télécharger » sur ordinateur : un lien YouTube, SoundCloud ou Spotify, ou une recherche « Artiste - Titre ».",
+      "À la fin de la file, des propositions : réécouter, dans la même veine, vos plus écoutés, vos titres aimés…",
+      "Tri dans « Titres aimés » (A-Z, plus récents…), comme dans les playlists.",
+      "Pendant l'envoi d'un son à un proche : pourcentage, Mo envoyés et temps restant.",
+      "Premier scan de la musique : l'avancement s'affiche, et il ne peut plus rester bloqué.",
+      "Téléphones modestes : le visualiseur d'« À l'écoute » est plus léger."
+    ]
+  },
+  {
+    "version": "0.8.0",
+    "date": "2026-11-18",
+    "items": [
+      "Cartes de paroles « Arcane », façon tarot.",
+      "Playlists : sélection de plusieurs morceaux (appui long ou « Sélectionner »), ajout à plusieurs playlists d'un coup, tri dans une playlist, ajout depuis l'écran de lecture.",
+      "Mode baladeur : le bouton retour d'Android fait MENU.",
+      "Noms d'artistes tirés des titres de vidéos nettoyés.",
+      "Avancement des téléchargements en direct.",
+      "Partage Wi-Fi chiffré entre appareils."
+    ]
+  },
+  {
+    "version": "0.7.1",
+    "date": "2026-11-12",
+    "items": [
+      "Mise à jour Android par le navigateur : plus d'alerte Play Protect.",
+      "Les grosses playlists s'ouvrent vite.",
+      "Envoi d'une grosse playlist par code, en plusieurs parties."
+    ]
+  },
+  {
+    "version": "0.7.0",
+    "date": "2026-11-12",
+    "items": ["Mode baladeur sur téléphone : boîtier, molette tactile, 5 finitions, paroles sur petit écran."]
+  }
+]

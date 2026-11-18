@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { SEEN_KEY, type Release } from "@/lib/whatsNew";
 
 export type Route =
   | { name: "recent" }
@@ -63,6 +64,9 @@ function push(kind: Entry, replace = false) {
 
 export const useUiStore = defineStore("ui", {
   state: () => ({
+    /** Fenêtre « Quoi de neuf ? » ouverte : titre et versions montrées. `seen` : version à
+     *  noter comme vue à la fermeture (après une mise à jour). */
+    whatsNew: null as { title: string; releases: Release[]; seen?: string } | null,
     route: { name: "recent" } as Route,
     history: [] as Route[],
     panel: null as SidePanel,
@@ -99,6 +103,17 @@ export const useUiStore = defineStore("ui", {
     canGoBack: (state) => state.history.length > 0,
   },
   actions: {
+    closeWhatsNew() {
+      const seen = this.whatsNew?.seen;
+      if (seen) {
+        try {
+          localStorage.setItem(SEEN_KEY, seen);
+        } catch {
+          // stockage indisponible : la fenêtre reviendra au prochain lancement
+        }
+      }
+      this.whatsNew = null;
+    },
     go(route: Route) {
       if (JSON.stringify(route) === JSON.stringify(this.route)) return;
       this.history.push(this.route);

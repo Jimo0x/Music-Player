@@ -44,6 +44,8 @@ import Sidebar from "@/components/Sidebar.vue";
 import TrackMenu from "@/components/TrackMenu.vue";
 import TrackPicker from "@/components/TrackPicker.vue";
 import UpdateDialog from "@/components/UpdateDialog.vue";
+import WhatsNew from "@/components/WhatsNew.vue";
+import { notesFromReleaseBody, SEEN_KEY, unseenReleases } from "@/lib/whatsNew";
 import AlbumDetail from "@/views/AlbumDetail.vue";
 import AlbumsView from "@/views/AlbumsView.vue";
 import ArtistsView from "@/views/ArtistsView.vue";
@@ -290,6 +292,34 @@ const offPlayback: (() => void)[] = [];
 const onPopState = () => ui.onPopState();
 let saveInterval: ReturnType<typeof setInterval> | null = null;
 
+/** Premier lancement après une mise à jour : « Quoi de neuf ? », une seule fois. */
+async function showWhatsNew() {
+  let current: string;
+  try {
+    const { getVersion } = await import("@tauri-apps/api/app");
+    current = await getVersion();
+  } catch {
+    return;
+  }
+  if (!current) return;
+  let lastSeen: string | null;
+  try {
+    lastSeen = localStorage.getItem(SEEN_KEY);
+  } catch {
+    return;
+  }
+  const releases = unseenReleases(current, lastSeen);
+  if (releases.length) ui.whatsNew = { title: "Quoi de neuf ?", releases, seen: current };
+}
+
+/** Mise à jour proposée : ses nouveautés, tirées du texte de la version GitHub. */
+const updateNotes = computed(() => notesFromReleaseBody(updater.available?.notes));
+function showUpdateNotes() {
+  const version = updater.available?.version;
+  if (!version) return;
+  ui.whatsNew = { title: `Nouveautés de la ${version}`, releases: [{ version, date: "", items: updateNotes.value }] };
+}
+
 onMounted(async () => {
   unlisten = await onScanEvents({
     progress: (p) => library.applyProgress(p),
@@ -366,6 +396,7 @@ onMounted(async () => {
   document.addEventListener("visibilitychange", onReturn);
   // Nouvelle version publiée ? (vérifiée une fois l'interface affichée)
   if (!demoMode) setTimeout(() => void updater.check(), 4000);
+  void showWhatsNew();
   saveInterval = setInterval(() => void api.saveSession(), 15_000);
   window.addEventListener("keydown", onKey);
 });
@@ -405,6 +436,7 @@ onBeforeUnmount(() => {
           <span v-else-if="updater.message">{{ updater.message }}</span>
           <span v-else>Music Player {{ updater.available.version }} est disponible (version installée : {{ updater.available.current }}).</span>
           <span v-if="!updater.installing" class="banner-actions">
+            <button v-if="updateNotes.length" type="button" class="pill pill-ghost" @click="showUpdateNotes">Quoi de neuf ?</button>
             <button type="button" class="pill pill-accent" @click="updater.install()">Mettre à jour</button>
             <button type="button" class="icon-btn" aria-label="Plus tard" @click="updater.dismissed = true"><Icon name="close" :size="14" /></button>
           </span>
@@ -494,6 +526,7 @@ onBeforeUnmount(() => {
     <SelectionBar />
     <AddToPlaylists />
     <UpdateDialog />
+    <WhatsNew />
     <ShareDialog />
     <FeedbackDialog />
     <FriendChat />

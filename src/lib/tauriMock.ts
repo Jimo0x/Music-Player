@@ -9,6 +9,7 @@
 // statiquement faux en prod ⇒ tree-shaké par Rollup) pour ne jamais
 // atterrir dans le bundle livré à l'utilisateur.
 
+import pkg from "../../package.json";
 import type { InitialState, Lyrics, Playlist, PlaybackStatus, QueueView, RepeatMode, ShareImportResult, Track } from "./types";
 
 const DEMO_ALBUMS = [
@@ -508,6 +509,8 @@ export function installTauriMock() {
       custom_dir: "/custom",
     }),
     save_session: () => undefined,
+    // Version de l'appli (« Quoi de neuf ? », Réglages) : celle du projet.
+    "plugin:app|version": () => pkg.version,
   };
 
   (window as any).__TAURI_INTERNALS__ = {

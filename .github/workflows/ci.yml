@@ -80,19 +80,15 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
+      # « Quoi de neuf ? » (src/nouveautes.json) puis l'installation : la publication échoue si
+      # la version n'a pas de nouveautés.
+      - name: Texte de la version
+        run: node scripts/release-notes.mjs "${GITHUB_REF_NAME}" > release-notes.md
       - uses: softprops/action-gh-release@v2
         with:
           name: "Music Player ${{ github.ref_name }}"
-          body: |
-            Installeurs générés automatiquement par la CI pour Windows, macOS, Linux et Android.
-            Choisis le fichier correspondant à ton système ci-dessous.
-            Les applications déjà installées (à partir de la 0.4.3 sur ordinateur, 0.4.4 sur Android) proposent la mise à jour d'elles-mêmes.
-
-            Configuration requise :
-            - Android 8.0 ou plus, Android System WebView à jour (111+) : Music-Player-android-arm64.apk (la plupart des téléphones), Music-Player-android-armv7.apk (anciens téléphones 32 bits) ou Music-Player-android.apk (complet, pour tous)
-            - Windows 10/11 64 bits : Music.Player_*_x64-setup.exe
-            - macOS 10.15 ou plus, Mac Apple Silicon : Music.Player_*_aarch64.dmg
-            - Linux x86_64 (Ubuntu 22.04, Debian 12, Fedora 38 ou plus récents) : .deb, .rpm ou .AppImage
+          body_path: release-notes.md
 
   release:
     needs: [test, create-release]
@@ -168,6 +164,14 @@ jobs:
             exit 1
           fi
 
+      - name: Texte de la version (nouveautés)
+        shell: bash
+        run: |
+          {
+            echo "RELEASE_BODY<<NOTES_FIN"
+            node scripts/release-notes.mjs "${GITHUB_REF_NAME}"
+            echo "NOTES_FIN"
+          } >> "$GITHUB_ENV"
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -179,16 +183,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Music Player ${{ github.ref_name }}"
-          releaseBody: |
-            Installeurs générés automatiquement par la CI pour Windows, macOS, Linux et Android.
-            Choisis le fichier correspondant à ton système ci-dessous.
-            Les applications déjà installées (à partir de la 0.4.3 sur ordinateur, 0.4.4 sur Android) proposent la mise à jour d'elles-mêmes.
-
-            Configuration requise :
-            - Android 8.0 ou plus, Android System WebView à jour (111+) : Music-Player-android-arm64.apk (la plupart des téléphones), Music-Player-android-armv7.apk (anciens téléphones 32 bits) ou Music-Player-android.apk (complet, pour tous)
-            - Windows 10/11 64 bits : Music.Player_*_x64-setup.exe
-            - macOS 10.15 ou plus, Mac Apple Silicon : Music.Player_*_aarch64.dmg
-            - Linux x86_64 (Ubuntu 22.04, Debian 12, Fedora 38 ou plus récents) : .deb, .rpm ou .AppImage
+          releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: false
           prerelease: false
 

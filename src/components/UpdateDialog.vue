@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { notesFromReleaseBody } from "@/lib/whatsNew";
 import { useUiStore } from "@/stores/ui";
 import { useUpdaterStore } from "@/stores/updater";
 import Icon from "./Icon.vue";
@@ -10,6 +11,8 @@ const updater = useUpdaterStore();
 const ui = useUiStore();
 
 const open = computed(() => ui.isMobile && !!updater.available && !updater.dismissed);
+/** Nouveautés de la version proposée (texte de la version GitHub). */
+const notes = computed(() => notesFromReleaseBody(updater.available?.notes));
 const percent = computed(() => (updater.progress === null ? null : Math.round(updater.progress * 100)));
 </script>
 
@@ -25,6 +28,13 @@ const percent = computed(() => (updater.progress === null ? null : Math.round(up
             Version actuelle : {{ updater.available.current }}<template v-if="updater.sizeLabel"> · {{ updater.sizeLabel }} à télécharger</template>
           </span>
         </p>
+
+        <div v-if="notes.length && !updater.installing" class="update-notes">
+          <p class="update-notes-title">Quoi de neuf ?</p>
+          <ul>
+            <li v-for="(item, i) in notes" :key="i">{{ item }}</li>
+          </ul>
+        </div>
 
         <div v-if="updater.installing" class="update-progress" role="status">
           <div class="track" :class="{ indeterminate: percent === null }">
@@ -58,6 +68,29 @@ const percent = computed(() => (updater.progress === null ? null : Math.round(up
 </template>
 
 <style scoped>
+.update-notes {
+  max-height: 34vh;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  overflow-y: auto;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  text-align: left;
+}
+.update-notes-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.update-notes ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(235, 242, 255, 0.82);
+}
 .update-scrim {
   position: fixed;
   inset: 0;

@@ -54,6 +54,12 @@ Tests réels désactivés par défaut (réseau, outils installés) :
 
 ## Publier une version
 
+0. **« Quoi de neuf ? » obligatoire** (demande du propriétaire, 18/11/2026) : ajouter en tête de
+   `src/nouveautes.json` la version et ses nouveautés, en phrases simples pour les utilisateurs
+   (pas de jargon technique). L'appli les montre une fois après la mise à jour, dans les
+   Réglages et avant de mettre à jour ; la CI en fait le texte de la version GitHub
+   (`scripts/release-notes.mjs`). Sans elles, le test `whatsNew.test.ts` et la publication
+   échouent.
 1. Monter la version dans **5 fichiers** : `package.json`, `src-tauri/tauri.conf.json`,
    `src-tauri/Cargo.toml` (1re occurrence), `src-tauri/Cargo.lock` (entrée du paquet
    `music-player` seulement), `package-lock.json` (**les 2 entrées racine seulement** : un

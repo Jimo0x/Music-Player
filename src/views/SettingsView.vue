@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { getVersion } from "@tauri-apps/api/app";
+import { RELEASES } from "@/lib/whatsNew";
 import { api } from "@/lib/api";
 import { openDefaultApps } from "@/lib/androidMedia";
 import { formatCollection } from "@/lib/format";
@@ -238,6 +239,11 @@ const shortcuts = [
 
     <section class="section-card">
       <h2><Icon name="refresh" :size="17" /> Mises à jour</h2>
+      <p>
+        <button type="button" class="pill pill-ghost" @click="ui.whatsNew = { title: 'Nouveautés', releases: RELEASES }">
+          <Icon name="sparkle" :size="15" /> Nouveautés de chaque version
+        </button>
+      </p>
       <p v-if="onAndroid" class="muted">
         Version installée : {{ version ?? "—" }}. L'application vérifie au démarrage, et en arrière-plan quelques fois par
         jour même fermée, si une nouvelle version est publiée : une notification « Mettre à jour » vous prévient. Android
