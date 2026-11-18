@@ -250,12 +250,16 @@ export async function onFetchEvents(handlers: {
   queue: (jobs: FetchJob[]) => void;
   job: (update: FetchJobUpdate) => void;
   error: (message: string) => void;
+  /** Avancement d'une tâche : part téléchargée (0 à 1), ou null si l'outil ne la donne pas. */
+  progress?: (update: { id: string; part: number | null }) => void;
 }): Promise<UnlistenFn> {
   const offs: UnlistenFn[] = [];
   try {
     offs.push(await listen<FetchJob[]>("fetch-queue-updated", (e) => handlers.queue(e.payload)));
     offs.push(await listen<FetchJobUpdate>("fetch-job-updated", (e) => handlers.job(e.payload)));
     offs.push(await listen<string>("fetch-error", (e) => handlers.error(e.payload)));
+    const progress = handlers.progress;
+    if (progress) offs.push(await listen<{ id: string; part: number | null }>("fetch-job-progress", (e) => progress(e.payload)));
   } catch {
     // Mode démo : pas d'événements.
   }

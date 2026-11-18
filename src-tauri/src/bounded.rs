@@ -15,10 +15,25 @@ pub enum Bounded {
     Cancelled { stdout: String, stderr: String },
 }
 
-fn drain(mut pipe: impl Read + Send + 'static) -> JoinHandle<String> {
+/// Lecture au fil de l'eau d'une sortie : `watch` reçoit chaque morceau de texte dès qu'il
+/// arrive (barre de progression), le tout est gardé pour le diagnostic.
+pub type Watch = std::sync::Arc<dyn Fn(&str) + Send + Sync>;
+
+fn drain(mut pipe: impl Read + Send + 'static, watch: Option<Watch>) -> JoinHandle<String> {
     std::thread::spawn(move || {
         let mut bytes = Vec::new();
-        let _ = pipe.read_to_end(&mut bytes);
+        let mut buffer = [0u8; 4096];
+        loop {
+            match pipe.read(&mut buffer) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    if let Some(watch) = &watch {
+                        watch(&String::from_utf8_lossy(&buffer[..n]));
+                    }
+                    bytes.extend_from_slice(&buffer[..n]);
+                }
+            }
+        }
         String::from_utf8_lossy(&bytes).into_owned()
     })
 }
@@ -52,14 +67,19 @@ fn stop(child: &mut Child) {
 /// Lance `command` ; l'arrête s'il dépasse `limit` ou si `cancel` passe à vrai. Les sorties sont
 /// lues pendant l'exécution (un journal bavard ne peut pas bloquer le programme).
 pub fn run(command: &mut Command, limit: Duration, cancel: &AtomicBool) -> std::io::Result<Bounded> {
+    run_watching(command, limit, cancel, None)
+}
+
+/// Comme `run`, en passant la sortie à `watch` au fur et à mesure (avancement d'un téléchargement).
+pub fn run_watching(command: &mut Command, limit: Duration, cancel: &AtomicBool, watch: Option<Watch>) -> std::io::Result<Bounded> {
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
         command.process_group(0);
     }
     let mut child = command.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
-    let out = drain(child.stdout.take().expect("sortie redirigée"));
-    let err = drain(child.stderr.take().expect("erreurs redirigées"));
+    let out = drain(child.stdout.take().expect("sortie redirigée"), watch.clone());
+    let err = drain(child.stderr.take().expect("erreurs redirigées"), watch);
     let started = Instant::now();
     let outcome = loop {
         if let Some(status) = child.try_wait()? {

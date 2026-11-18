@@ -217,7 +217,15 @@ mod tests {
             duration_secs: Some(213.0),
             playlist_id: None,
         };
-        let track = download_and_import(source, &wanted, root.path(), &AtomicBool::new(false)).expect("morceau importé");
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::<Option<f32>>::new()));
+        let keep = seen.clone();
+        let sink: crate::fetch::common::ProgressSink = std::sync::Arc::new(move |p| keep.lock().expect("verrou").push(p));
+        let track = crate::fetch::common::with_progress(sink, || download_and_import(source, &wanted, root.path(), &AtomicBool::new(false))).expect("morceau importé");
+        let seen = seen.lock().expect("verrou").clone();
+        println!("{} : {} avancements, dernier {:?}", source.name(), seen.len(), seen.last());
+        if source.name() == "yt-dlp" {
+            assert!(seen.iter().any(|p| p.is_some_and(|v| v > 0.0 && v < 1.0)), "avancement reçu en cours de téléchargement");
+        }
         println!("{} : {track:?}", source.name());
         assert!(Path::new(&track.path).is_file());
         assert_eq!(track.title, "Never Gonna Give You Up", "titre propre, pas celui de la vidéo");

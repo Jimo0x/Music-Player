@@ -16,6 +16,8 @@ export const useFetchStore = defineStore("fetch", () => {
   const initialized = ref(false);
   const loading = ref(false);
   const lastError = ref<string | null>(null);
+  /** Avancement des tâches en cours : part téléchargée (0 à 1), null si inconnue. */
+  const progress = ref<Record<string, number | null>>({});
 
   const active = computed(() => jobs.value.filter((job) => job.state === "queued" || job.state === "running"));
   const finished = computed(() => jobs.value.filter((job) => job.state !== "queued" && job.state !== "running"));
@@ -43,9 +45,17 @@ export const useFetchStore = defineStore("fetch", () => {
             if (!job) return;
             job.state = update.state;
             job.last_error = update.error;
+            if (update.state !== "running" && update.id in progress.value) {
+              const rest = { ...progress.value };
+              delete rest[update.id];
+              progress.value = rest;
+            }
           },
           error: (text) => {
             lastError.value = text;
+          },
+          progress: ({ id, part }) => {
+            progress.value = { ...progress.value, [id]: part };
           },
         });
         const [tools, list] = await Promise.all([api.fetchAvailability(), api.fetchJobs()]);
@@ -94,5 +104,5 @@ export const useFetchStore = defineStore("fetch", () => {
     initialized.value = false;
   }
 
-  return { jobs, availability, initialized, loading, lastError, active, finished, anyTool, initialize, refreshAvailability, enqueue, cancel, clearFinished, dispose };
+  return { jobs, progress, availability, initialized, loading, lastError, active, finished, anyTool, initialize, refreshAvailability, enqueue, cancel, clearFinished, dispose };
 });

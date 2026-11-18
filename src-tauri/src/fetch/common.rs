@@ -83,6 +83,36 @@ pub fn cleanup_attempt(attempt_dir: &Path) {
     let _ = fs::remove_dir_all(attempt_dir);
 }
 
+// ---------------------------------------------------------------- avancement
+
+/// Avancement d'un téléchargement : part faite (0 à 1), ou `None` si l'outil ne le dit pas.
+pub type ProgressSink = std::sync::Arc<dyn Fn(Option<f32>) + Send + Sync>;
+
+thread_local! {
+    static SINK: std::cell::RefCell<Option<ProgressSink>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Exécute `f` avec un destinataire d'avancement : les adaptateurs lancés dans `f` (même fil)
+/// le retrouvent par `progress_sink`, sans changer leur interface.
+pub fn with_progress<T>(sink: ProgressSink, f: impl FnOnce() -> T) -> T {
+    SINK.with(|cell| *cell.borrow_mut() = Some(sink));
+    let result = f();
+    SINK.with(|cell| *cell.borrow_mut() = None);
+    result
+}
+
+pub fn progress_sink() -> Option<ProgressSink> {
+    SINK.with(|cell| cell.borrow().clone())
+}
+
+/// Pourcentage d'une ligne d'avancement de yt-dlp (« [download]  45.3% of 3.45MiB … »).
+pub fn ytdlp_percent(line: &str) -> Option<f32> {
+    let rest = line.trim_start().strip_prefix("[download]")?;
+    let token = rest.split_whitespace().next()?;
+    let value: f32 = token.strip_suffix('%')?.parse().ok()?;
+    (0.0..=100.0).contains(&value).then_some(value / 100.0)
+}
+
 /// FFmpeg absent : à reconnaître avant « introuvable » (« ffmpeg not found » contient « not found »).
 pub fn ffmpeg_missing(lower_log: &str) -> bool {
     lower_log.contains("ffmpeg") && (lower_log.contains("not found") || lower_log.contains("not installed") || lower_log.contains("no such file"))
@@ -164,6 +194,15 @@ mod tests {
     use std::fs;
 
     use super::{create_attempt_directory, take_output, tool_locations, truncate_log, MAX_LOG_CHARS};
+
+    #[test]
+    fn lit_le_pourcentage_de_yt_dlp() {
+        use super::ytdlp_percent;
+        assert!(ytdlp_percent("[download]  45.3% of    3.45MiB at  1.2MiB/s ETA 00:02").is_some_and(|p| (p - 0.453).abs() < 1e-4));
+        assert_eq!(ytdlp_percent("[download] 100% of 3.45MiB in 00:03"), Some(1.0));
+        assert_eq!(ytdlp_percent("[download] Destination: x.webm"), None);
+        assert_eq!(ytdlp_percent("[ExtractAudio] Destination: x.mp3"), None);
+    }
 
     #[test]
     fn ne_rend_que_des_executables_existants() {

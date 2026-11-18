@@ -355,7 +355,18 @@ async function copyMissing(list: MatchedPlaylist[]) {
           <li v-for="job in fetchStore.jobs" :key="job.id" class="fetch-job" :class="job.state">
             <div class="fetch-job-main">
               <strong>{{ job.wanted.artist ? `${job.wanted.artist} — ` : "" }}{{ job.wanted.title }}</strong>
-              <span class="muted">{{ jobStateLabel[job.state] }}</span>
+              <span class="muted">
+                {{ jobStateLabel[job.state] }}<template v-if="job.state === 'running' && typeof fetchStore.progress[job.id] === 'number'"
+                  >&nbsp;· {{ Math.round((fetchStore.progress[job.id] ?? 0) * 100) }} %</template
+                >
+              </span>
+              <!-- Barre d'avancement : réelle avec yt-dlp, animée avec spotDL (qui ne la donne pas). -->
+              <span
+                v-if="job.state === 'running'"
+                class="job-bar"
+                :class="{ indeterminate: typeof fetchStore.progress[job.id] !== 'number' }"
+                ><i :style="typeof fetchStore.progress[job.id] === 'number' ? { width: `${(fetchStore.progress[job.id] ?? 0) * 100}%` } : undefined"
+              /></span>
               <details v-if="job.last_error && job.state === 'failed'" class="job-error">
                 <summary>Détails</summary>
                 <pre>{{ job.last_error }}</pre>
@@ -489,6 +500,33 @@ async function copyMissing(list: MatchedPlaylist[]) {
   border-radius: var(--radius);
   background: rgba(var(--fg-rgb), 0.04);
   font-size: 13px;
+}
+.job-bar {
+  position: relative;
+  display: block;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: rgba(var(--fg-rgb), 0.1);
+  overflow: hidden;
+}
+.job-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s;
+}
+.job-bar.indeterminate i {
+  width: 35%;
+  animation: job-slide 1.2s ease-in-out infinite;
+}
+@keyframes job-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
 }
 .fetch-job.done .muted {
   color: var(--success);

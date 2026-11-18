@@ -25,6 +25,33 @@ use crate::state::{AppState, Locked};
 const QUEUE_EVENT: &str = "fetch-queue-updated";
 const JOB_EVENT: &str = "fetch-job-updated";
 const QUEUE_FILE: &str = "telechargements.json";
+const PROGRESS_EVENT: &str = "fetch-job-progress";
+
+#[derive(Clone, Serialize)]
+struct JobProgress {
+    id: String,
+    /// Part téléchargée (0 à 1) ; absente si l'outil ne la donne pas (spotDL).
+    part: Option<f32>,
+}
+
+/// Avancement d'une tâche vers l'interface, au plus un envoi par pourcent ou par quart de seconde.
+fn progress_events(app: &tauri::AppHandle, id: &str) -> crate::fetch::common::ProgressSink {
+    let app = app.clone();
+    let id = id.to_owned();
+    let last = Mutex::new((f32::MIN, std::time::Instant::now()));
+    Arc::new(move |part: Option<f32>| {
+        let value = part.unwrap_or(-1.0);
+        {
+            let mut last = last.locked();
+            let step = (value - last.0).abs() >= 0.01 || value >= 1.0;
+            if !step || (last.1.elapsed() < std::time::Duration::from_millis(250) && value < 1.0) {
+                return;
+            }
+            *last = (value, std::time::Instant::now());
+        }
+        let _ = app.emit(PROGRESS_EVENT, JobProgress { id: id.clone(), part });
+    })
+}
 
 /// État partagé de la file, enregistré dans Tauri sous `Arc<FetchRuntime>`.
 pub struct FetchRuntime {
@@ -140,7 +167,9 @@ fn worker_loop(app: tauri::AppHandle, runtime: Arc<FetchRuntime>) {
         emit_job(&app, &runtime, &id);
         emit_queue(&app, &runtime);
 
-        let (state, error) = match run_job(&app, &wanted, &cancel) {
+        let sink = progress_events(&app, &id);
+        let outcome = crate::fetch::common::with_progress(sink, || run_job(&app, &wanted, &cancel));
+        let (state, error) = match outcome {
             Ok(track) => match add_imported_track(&app, &wanted, track) {
                 Ok(()) => (JobState::Done, None),
                 Err(detail) => (JobState::Failed, Some(detail)),

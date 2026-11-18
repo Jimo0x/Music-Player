@@ -13,7 +13,7 @@ use std::time::Duration;
 use crate::bounded::{self, Bounded};
 use crate::ffmpeg;
 
-use super::common::{cleanup_attempt, create_attempt_directory, ffmpeg_missing, join_logs, network_failure, spotdl_ffmpeg, take_output, tool_locations, truncate_log};
+use super::common::{cleanup_attempt, create_attempt_directory, ffmpeg_missing, join_logs, network_failure, progress_sink, spotdl_ffmpeg, take_output, tool_locations, truncate_log, ytdlp_percent};
 use super::source::Source;
 use super::spotdl::requested_file_name;
 use super::{JobError, Wanted};
@@ -128,6 +128,8 @@ fn run_download(runner: Runner, query: &str, attempt_dir: &Path, cancel: &Atomic
         .arg("--extractor-retries")
         .arg("3")
         .arg("--newline")
+        // « --print » rend yt-dlp silencieux : l'avancement est demandé quand même.
+        .arg("--progress")
         .arg("--paths")
         .arg(attempt_dir)
         .arg("--output")
@@ -144,7 +146,25 @@ fn run_download(runner: Runner, query: &str, attempt_dir: &Path, cancel: &Atomic
         // Le séparateur empêche la recherche d'être interprétée comme une option.
         .arg("--")
         .arg(query);
-    run_command(&mut command, COMMAND_TIMEOUT, cancel)
+    // Avancement : chaque « [download] 45.3% » est transmis (yt-dlp écrit une ligne par étape
+    // grâce à --newline).
+    let watch: Option<crate::bounded::Watch> = progress_sink().map(|sink| {
+        std::sync::Arc::new(move |text: &str| {
+            for line in text.split(['\n', '\r']) {
+                if let Some(part) = ytdlp_percent(line) {
+                    sink(Some(part));
+                }
+            }
+        }) as crate::bounded::Watch
+    });
+    ffmpeg::quiet(&mut command);
+    bounded::run_watching(&mut command, COMMAND_TIMEOUT, cancel, watch).map_err(|error| {
+        if error.kind() == io::ErrorKind::NotFound {
+            JobError::ToolMissing("yt-dlp est introuvable. Installez-le séparément puis redémarrez Music Player.".to_owned())
+        } else {
+            JobError::Failed(format!("Impossible de lancer yt-dlp : {error}"))
+        }
+    })
 }
 
 fn run_command(command: &mut Command, timeout: Duration, cancel: &AtomicBool) -> Result<Bounded, JobError> {
