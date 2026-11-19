@@ -310,15 +310,37 @@ export const useSyncStore = defineStore("sync", {
     /** Un tour : fusion avec l'état du relais, changements appliqués ici, nouvel état publié.
      *  `decision` : réponse à une suppression massive (« appliquer » ou « tout garder »). */
     async run(decision?: "appliquer" | "garder"): Promise<boolean> {
+      if (!this.saved || this.running) return false;
       const id = this.identity();
       const library = useLibraryStore();
-      // Bibliothèque pas encore lue : tout semblerait absent.
-      if (!id || this.running || library.scanning || !library.tracks.length) return false;
+      // Avant, ces cas renvoyaient « false » sans rien dire : appareils liés, « Synchroniser
+      // maintenant » sans effet et aucune explication. Chacun a maintenant son message.
+      if (!id) {
+        this.error = useFriendsStore().base
+          ? "Profil de liaison absent sur cet appareil : déliez-le puis reliez-le avec un code."
+          : "Aucun relais disponible (Réglages → Partage) : la synchronisation attend.";
+        return false;
+      }
+      // Bibliothèque pas encore lue : tout semblerait absent. Relancée à la fin du scan (App.vue).
+      if (library.scanning) {
+        this.error = "Lecture de la bibliothèque en cours : la synchronisation suivra.";
+        return false;
+      }
+      if (!library.tracks.length) {
+        this.error = "Bibliothèque vide sur cet appareil : choisissez le dossier de musique pour synchroniser.";
+        return false;
+      }
       this.running = true;
       this.error = null;
       try {
         for (let attempt = 0; attempt < 3; attempt++) {
-          const remote = await downloadDoc(id);
+          let remote: Awaited<ReturnType<typeof downloadDoc>>;
+          try {
+            remote = await downloadDoc(id);
+          } catch (e) {
+            if (e instanceof RelayError && e.status === 409) continue;
+            throw e;
+          }
           const base: SyncBase = decision === "garder" ? EMPTY_BASE : (load<SyncBase>(BASE_KEY) ?? EMPTY_BASE);
           const local = localDoc(base, this.device(await api.getListens()));
           let start = remote?.doc ?? emptyDoc();
@@ -354,6 +376,7 @@ export const useSyncStore = defineStore("sync", {
           }
           return true;
         }
+        this.error = "D'autres appareils publient en même temps : nouvel essai dans quelques minutes.";
         return false;
       } catch (e) {
         this.error = e instanceof Error ? e.message : String(e);
@@ -365,9 +388,10 @@ export const useSyncStore = defineStore("sync", {
 
     /** Vérification légère : le relais n'est relu que si quelque chose a changé. */
     async check() {
+      if (!this.saved || this.held !== null) return;
       const id = this.identity();
-      if (!id || this.held !== null) return;
-      if (dirty) {
+      // Sans identité, `run` dit pourquoi (au lieu de rester muet).
+      if (dirty || !id) {
         await this.run();
         return;
       }
@@ -390,6 +414,11 @@ export const useSyncStore = defineStore("sync", {
       await this.migrateAccount();
       if (timer) return;
       timer = setInterval(() => void this.check(), CHECK_EVERY);
+      // Téléphone : l'appli en arrière-plan ne fait plus tourner ses minuteries. Au retour, on
+      // vérifie tout de suite au lieu d'attendre jusqu'à 5 minutes.
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") void this.check();
+      });
       void this.check();
     },
   },
