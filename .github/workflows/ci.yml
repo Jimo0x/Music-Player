@@ -36,6 +36,8 @@ jobs:
 
       - run: npm ci
       - run: npm run lint
+      - run: npx vue-tsc --noEmit
+      - run: npx vitest run
 
       - name: cargo test (queue, bibliothèque, playlists, session, égaliseur)
         working-directory: src-tauri
