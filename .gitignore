@@ -29,3 +29,7 @@ qa*.py
 *.njsproj
 *.sln
 *.sw?
+
+# Python (essais du module de téléchargement)
+__pycache__/
+*.pyc
