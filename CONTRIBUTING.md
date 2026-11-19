@@ -63,7 +63,12 @@ l'interface, mais il ne remplace pas un essai dans la vraie appli.
    comment c'est testé, captures avant/après pour l'interface (PC **et** téléphone).
 6. **La relecture** : on te demandera peut-être des changements. C'est normal et ça fait
    partie du travail ; réponds dans la discussion et pousse les corrections sur la même
-   branche.
+   branche. Chaque relecture te **mentionne (@ton-pseudo)** et se lit dans l'onglet
+   **« Conversation »** de la demande (pas dans « Files changed »). Pour ne rien manquer :
+   - sur la page du dépôt, **Watch → Participating and @mentions** (ou « All Activity ») ;
+   - dans GitHub, **Settings → Notifications** : coche **Email** (et/ou **Web and Mobile**)
+     pour « Participating, @mentions and custom », et vérifie l'adresse e-mail choisie ;
+   - l'appli **GitHub Mobile** prévient aussi sur le téléphone.
 7. **La fusion** est faite par le propriétaire, une fois la relecture terminée et la CI verte.
 
 ## Les vérifications (obligatoires)
