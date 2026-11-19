@@ -254,7 +254,7 @@ pub fn read_media_link(url: &str) -> Result<(String, Vec<LinkEntry>), JobError> 
     } else {
         let runner = resolve_runner(&cancel)?;
         let mut command = runner.command();
-        command.arg("--ignore-config").arg("--flat-playlist").arg("--dump-single-json").arg("--no-warnings").arg("--").arg(url);
+        link_arguments(&mut command, url);
         match run_command(&mut command, PROBE_TIMEOUT * 6, &cancel)? {
             Bounded::Finished { status, stdout, .. } if status.success() => stdout,
             Bounded::Finished { stdout, stderr, .. } => return Err(classify_failure(&stdout, &stderr)),
@@ -263,6 +263,14 @@ pub fn read_media_link(url: &str) -> Result<(String, Vec<LinkEntry>), JobError> 
         }
     };
     Ok(parse_link_entries(&json))
+}
+
+/// Lecture « à plat » d'un lien. `--no-playlist` : un son partagé depuis une playlist ou un Mix
+/// YouTube (`watch?v=…&list=RD…`) reste ce son-là ; sans lui, le Mix entier (jusqu'à 500
+/// morceaux) partait dans la file. Un vrai lien de playlist (`playlist?list=…`, album) est
+/// toujours lu en entier : l'option ne vaut que pour les liens qui désignent les deux.
+fn link_arguments(command: &mut Command, url: &str) {
+    command.arg("--ignore-config").arg("--flat-playlist").arg("--no-playlist").arg("--dump-single-json").arg("--no-warnings").arg("--").arg(url);
 }
 
 /// Nom et morceaux d'une réponse `--flat-playlist --dump-single-json` (même forme côté
@@ -436,6 +444,17 @@ mod tests {
         // Un seul son (pas d'« entries ») : rien à éclater, le lien est téléchargé tel quel.
         assert!(super::parse_link_entries(r#"{"_type":"video","title":"Seul"}"#).1.is_empty());
         assert!(super::parse_link_entries("pas du json").1.is_empty());
+    }
+
+    #[test]
+    fn un_son_partage_depuis_un_mix_reste_un_seul_son() {
+        let mut command = std::process::Command::new("yt-dlp");
+        let url = "https://www.youtube.com/watch?v=abc&list=RDabc&start_radio=1";
+        super::link_arguments(&mut command, url);
+        let args: Vec<String> = command.get_args().map(|a| a.to_string_lossy().into_owned()).collect();
+        assert!(args.contains(&"--no-playlist".to_owned()), "{args:?}");
+        // Le lien reste un seul argument, après « -- ».
+        assert_eq!(args[args.len() - 2..], ["--".to_owned(), url.to_owned()]);
     }
 
     #[test]

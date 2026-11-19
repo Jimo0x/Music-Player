@@ -41,7 +41,10 @@ def search(zip_path, query):
     """Candidats d'une recherche (« ytsearch5:… »), sans téléchargement : même forme que
     `yt-dlp --flat-playlist --dump-single-json`, lue par parse_candidates côté Rust."""
     yt_dlp = _load(zip_path)
-    options = {"quiet": True, "no_warnings": True, "extract_flat": "in_playlist", "skip_download": True}
+    # « noplaylist » : un lien de son partagé depuis un Mix YouTube (watch?v=…&list=RD…) reste
+    # ce son-là, comme --no-playlist sur ordinateur (sinon tout le Mix partait dans la file).
+    # Sans effet sur une recherche « ytsearch5: » ni sur un vrai lien de playlist.
+    options = {"quiet": True, "no_warnings": True, "extract_flat": "in_playlist", "skip_download": True, "noplaylist": True}
     with yt_dlp.YoutubeDL(options) as ydl:
         info = ydl.extract_info(query, download=False) or {}
     entries = []
