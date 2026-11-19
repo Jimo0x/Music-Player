@@ -86,6 +86,15 @@ Vérifier ensuite : `curl https://music-player-relais.loickamg.workers.dev/` pui
   `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333` et lire la console ou
   évaluer du JavaScript par le protocole DevTools (l'appli installée doit être fermée : instance
   unique).
+- **Android sur ce PC** : `bash scripts/android-local.sh x86_64 --install` (compile, signe avec
+  une clé de débogage, installe et lance sur l'émulateur ouvert « MusicPlayer_API34 » :
+  `"$LOCALAPPDATA/Android/Sdk/emulator/emulator.exe" -avd MusicPlayer_API34`). SDK et NDK
+  d'Android Studio (dossier par défaut). Pièges : le **Mode développeur de Windows** doit être
+  actif (Tauri crée un lien symbolique) ; Gradle exige **Java 17** (`C:\Android\jdk-17`, celui
+  d'Android Studio est trop récent) ; une classe appelée seulement depuis Rust (JNI) doit avoir
+  sa règle `-keep` (R8 retire ses méthodes, voir `proguard-ytdlp.pro`). Piloter l'émulateur par
+  `adb shell input tap` + `uiautomator dump` (repérer chaque bouton avant de toucher : la
+  fenêtre « Un avis ? » est vite ouverte par erreur).
 - **Avis des utilisateurs** : dans l'appli de bureau, « Avis reçus » (administrateur).
 - **Outils de téléchargement de ce PC** : spotDL et yt-dlp dans Anaconda
   (`C:\ProgramData\anaconda3\Scripts`), FFmpeg et Deno dans `~/.spotdl` ; l'appli les trouve

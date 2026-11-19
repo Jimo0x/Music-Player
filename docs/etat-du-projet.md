@@ -64,9 +64,17 @@ version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
 - **Page « Télécharger »** (barre latérale, Réglages) : lien direct (yt-dlp, sans recherche),
   lien Spotify (spotDL) ou « Artiste - Titre », playlist de destination, file partagée avec
   l'import Spotify (`FetchJobs.vue`). Lien direct essayé pour de vrai (vidéo YouTube importée).
-- **En attente d'un environnement Android** (pas de SDK sur ce PC, rien d'essayable ici) :
-  lecteur plein écran sur l'écran verrouillé (option B choisie), téléchargement sur téléphone
-  (réadapter yt-dlp dans l'appli, recherche spotDL refaite par nos soins).
+- **Téléchargement sur téléphone (fait le 19/11, pas encore publié)** : yt-dlp intégré
+  (Python 3.11 par Chaquopy 17.2.0, `src-tauri/android/python/mp_ytdlp.py`, pont Rust → Kotlin
+  par JNI `fetch/android.rs` + `YtDlpBridge.kt`). yt-dlp lui-même est téléchargé et mis à jour
+  par l'appli (`fetch/ytdlp_zip.rs`, empreinte SHA-256 vérifiée, contrôle quotidien). Liens
+  Spotify lus sans spotDL (page embed, 100 morceaux au plus, avertissement si coupé) ;
+  recherche à la façon de spotDL (5 candidats, notre correspondance choisit). Sur téléphone :
+  travail dans les données privées, morceau rangé dans « Musique/Music Player/Téléchargés »
+  en .m4a, étiquettes écrites par l'appli. **Essayé de bout en bout sur l'émulateur Android
+  14** (« The Weeknd - Blinding Lights » : trouvé, téléchargé en 15 s, ajouté et lu). Reste :
+  essai sur un vrai téléphone, APK plus gros (Python, environ +20 Mo par processeur).
+- **Lecteur plein écran sur l'écran verrouillé Android** (option B) : pas commencé.
 - **Ensuite (demande du propriétaire)** : revue de sécurité, puis optimisation poussée, une
   fois toutes les fonctions confirmées sur appareils.
 

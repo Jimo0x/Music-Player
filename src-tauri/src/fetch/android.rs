@@ -63,14 +63,27 @@ fn call_text(method: &str, args: &[&str]) -> Result<String, JobError> {
         let text: String = env.get_string(&out)?.into();
         Ok(text)
     })();
-    let text = result.map_err(|error| {
-        let _ = env.exception_clear();
-        failed(error)
-    })?;
+    let text = result.map_err(|error| failed(java_error(&mut env, error)))?;
     match text.strip_prefix("ERREUR:") {
         Some(message) => Err(classify(message)),
         None => Ok(text),
     }
+}
+
+/// Texte de l'exception Java en attente (« java.lang.NoSuchMethodError: … »), effacée ensuite ;
+/// sinon l'erreur JNI elle-même.
+fn java_error(env: &mut JNIEnv<'_>, error: jni::errors::Error) -> String {
+    if !matches!(error, jni::errors::Error::JavaException) {
+        return error.to_string();
+    }
+    let Ok(throwable) = env.exception_occurred() else { return error.to_string() };
+    let _ = env.exception_clear();
+    let text = env
+        .call_method(&throwable, "toString", "()Ljava/lang/String;", &[])
+        .and_then(|v| v.l())
+        .and_then(|o| env.get_string(&JString::from(o)).map(String::from));
+    let _ = env.exception_clear();
+    text.unwrap_or_else(|_| error.to_string())
 }
 
 fn classify(message: &str) -> JobError {

@@ -123,8 +123,9 @@ fn fetch_on_phone(wanted: &Wanted, dest_dir: &Path, cancel: &AtomicBool) -> Resu
         Some(url) => (url.to_owned(), None),
         None if wanted.url.is_some() => return Err(JobError::Failed("Ce lien n'est pas une adresse web valable (http ou https).".to_owned())),
         None => {
-            let candidates = parse_candidates(&android::search(&zip, &make_query(wanted)?)?);
-            let chosen = pick_candidate(wanted, &candidates).ok_or(JobError::NotFound)?.clone();
+            let raw = android::search(&zip, &make_query(wanted)?)?;
+            let candidates = parse_candidates(&raw);
+            let chosen = pick_candidate(wanted, &candidates).ok_or_else(|| no_match(&candidates, &raw))?.clone();
             (chosen.url.clone(), Some(chosen))
         }
     };
@@ -143,6 +144,20 @@ fn fetch_on_phone(wanted: &Wanted, dest_dir: &Path, cancel: &AtomicBool) -> Resu
         cleanup_attempt(&attempt_dir);
     }
     result
+}
+
+/// Aucun candidat retenu : lesquels ont été vus (pour comprendre, et pour l'écran « Détails »).
+fn no_match(candidates: &[Candidate], raw: &str) -> JobError {
+    if candidates.is_empty() {
+        let start: String = raw.chars().take(160).collect();
+        return JobError::Failed(format!("La recherche n'a renvoyé aucune vidéo YouTube (réponse : {start}…)."));
+    }
+    let seen: Vec<String> = candidates
+        .iter()
+        .take(5)
+        .map(|c| format!("« {} » ({}, {})", c.title, c.artist, c.duration_secs.map(|d| format!("{d:.0} s")).unwrap_or_else(|| "durée ?".into())))
+        .collect();
+    JobError::Failed(format!("Aucun des {} résultats ne correspond assez : {}.", candidates.len(), seen.join(" ; ")))
 }
 
 /// Résultat de recherche YouTube, avant tout téléchargement.

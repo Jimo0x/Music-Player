@@ -1857,6 +1857,13 @@ chaquopy {
 `;
   fs.writeFileSync(appGradlePath, appGradle);
 }
+// Appelé seulement depuis Rust (JNI) : sans cette règle, l'optimiseur de la version publiée
+// (R8) retire ses méthodes, qui semblent inutilisées.
+fs.writeFileSync(
+  path.join(androidDir, "app", "proguard-ytdlp.pro"),
+  `-keep class ${pkg}.YtDlpBridge { *; }
+`,
+);
 const pythonDir = path.join(root, "python");
 fs.mkdirSync(pythonDir, { recursive: true });
 fs.copyFileSync(path.resolve("src-tauri/android/python/mp_ytdlp.py"), path.join(pythonDir, "mp_ytdlp.py"));

@@ -19,10 +19,16 @@ pub const STAGING_DIR: &str = ".telechargements";
 
 /// Télécharge un morceau, vérifie son identité, puis le range dans le dossier de la bibliothèque.
 pub fn download_and_import(source: &dyn Source, wanted: &Wanted, library_root: &Path, cancel: &AtomicBool) -> Result<Track, JobError> {
+    download_and_import_into(source, wanted, library_root, &library_root.join(STAGING_DIR), cancel)
+}
+
+/// Comme `download_and_import`, avec un dossier de travail à part : sur téléphone, il est dans les
+/// données privées de l'appli (yt-dlp y écrit des fichiers « .part » que le dossier Musique refuse).
+pub fn download_and_import_into(source: &dyn Source, wanted: &Wanted, library_root: &Path, staging: &Path, cancel: &AtomicBool) -> Result<Track, JobError> {
     if cancel.load(Ordering::Relaxed) {
         return Err(JobError::Cancelled);
     }
-    let staging = library_root.join(STAGING_DIR);
+    let staging = staging.to_path_buf();
     let downloaded = source.fetch(wanted, &staging, cancel)?;
     let result = import_downloaded_file(&downloaded, wanted, library_root, source.name());
     remove_attempt_dir(&downloaded, &staging);
@@ -60,7 +66,7 @@ fn import_downloaded_file(downloaded: &Path, wanted: &Wanted, library_root: &Pat
         let unknown = named.artist == library::UNKNOWN_ARTIST;
         let file_name = same_extension(requested_file_name(&Wanted { artist: if unknown { String::new() } else { from_tags.artist.clone() }, ..from_tags }), downloaded);
         let destination = available_destination(library_root, &file_name)?;
-        fs::rename(downloaded, &destination)
+        move_file(downloaded, &destination)
             .map_err(|error| JobError::Failed(format!("Impossible de déplacer le morceau dans la bibliothèque : {error}")))?;
         return library::read_track(&destination).ok_or_else(|| {
             let _ = fs::remove_file(&destination);
@@ -89,7 +95,7 @@ fn import_downloaded_file(downloaded: &Path, wanted: &Wanted, library_root: &Pat
     }
 
     let destination = available_destination(library_root, &same_extension(requested_file_name(wanted), downloaded))?;
-    fs::rename(downloaded, &destination)
+    move_file(downloaded, &destination)
         .map_err(|error| JobError::Failed(format!("Impossible de déplacer le morceau dans la bibliothèque : {error}")))?;
 
     library::read_track(&destination).ok_or_else(|| {
@@ -97,6 +103,17 @@ fn import_downloaded_file(downloaded: &Path, wanted: &Wanted, library_root: &Pat
         let _ = fs::remove_file(&destination);
         JobError::Failed("Le morceau déplacé ne peut pas être relu par la bibliothèque.".to_owned())
     })
+}
+
+/// Déplace le fichier ; entre deux espaces de stockage (données privées → Musique, sur
+/// téléphone), `rename` est refusé : copie puis suppression de l'original.
+fn move_file(from: &Path, to: &Path) -> std::io::Result<()> {
+    if fs::rename(from, to).is_ok() {
+        return Ok(());
+    }
+    fs::copy(from, to)?;
+    let _ = fs::remove_file(from);
+    Ok(())
 }
 
 /// Nom demandé (« Artiste - Titre.mp3 ») avec l'extension réelle du fichier téléchargé : sur

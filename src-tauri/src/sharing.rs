@@ -251,6 +251,23 @@ pub fn received_dir(state: &AppState) -> PathBuf {
     imports_dir(&state.data_dir)
 }
 
+/// Téléphone : dossier des morceaux téléchargés, « Musique/Music Player/Téléchargés » (la racine
+/// du stockage est interdite d'écriture). Même repli que pour les morceaux reçus.
+///
+/// Pas de fichier d'essai ici (`writable`) : Android refuse les fichiers qui ne sont pas des sons
+/// dans « Musique », mais accepte le dossier et les morceaux qu'on y copie.
+pub fn downloads_dir(state: &AppState) -> PathBuf {
+    if let Some(music) = &state.music_dir {
+        let dir = music.join("Music Player").join("Téléchargés");
+        if fs::create_dir_all(&dir).is_ok() {
+            return dir;
+        }
+    }
+    let private = imports_dir(&state.data_dir);
+    let _ = fs::create_dir_all(&private);
+    private
+}
+
 fn writable(dir: &Path) -> bool {
     if fs::create_dir_all(dir).is_err() {
         return false;

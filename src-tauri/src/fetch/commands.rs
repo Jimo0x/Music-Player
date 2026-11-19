@@ -225,6 +225,14 @@ fn run_job(app: &tauri::AppHandle, wanted: &Wanted, cancel: &AtomicBool) -> Resu
         .clone()
         .ok_or_else(|| JobError::Failed("Choisissez d'abord le dossier de votre bibliothèque.".to_owned()))?;
     let root = PathBuf::from(root);
+    // Téléphone : yt-dlp intégré seul ; travail dans les données privées, morceau rangé dans
+    // « Musique/Music Player/Téléchargés » (la racine du stockage est interdite d'écriture).
+    if cfg!(target_os = "android") {
+        let state = app.state::<AppState>();
+        let destination = crate::sharing::downloads_dir(&state);
+        let staging = state.data_dir.join(super::import::STAGING_DIR);
+        return super::import::download_and_import_into(&YtDlpSource, wanted, &destination, &staging, cancel);
+    }
     // Lien direct : yt-dlp seul (spotDL ne lit que des liens Spotify, résolus avant la file).
     if wanted.url.is_some() {
         return download_and_import(&YtDlpSource, wanted, &root, cancel);
