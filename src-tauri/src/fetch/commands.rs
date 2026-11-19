@@ -92,6 +92,16 @@ pub fn fetch_availability() -> FetchAvailability {
     FetchAvailability { spotdl: SpotDlSource.available(), ytdlp: YtDlpSource.available() }
 }
 
+/// Recherche de la page Télécharger : résultats à choisir, rien n'est téléchargé.
+#[tauri::command(async)]
+pub fn fetch_search(query: String) -> Result<Vec<crate::fetch::ytdlp::SearchResult>, String> {
+    crate::fetch::ytdlp::search_songs(&query).map_err(|error| match error {
+        JobError::ToolMissing(_) => "La recherche demande yt-dlp (winget install yt-dlp), puis « Vérifier à nouveau ».".to_owned(),
+        JobError::NotFound => "Aucun résultat.".to_owned(),
+        other => other.to_string(),
+    })
+}
+
 #[tauri::command]
 pub fn fetch_jobs(runtime: tauri::State<'_, Arc<FetchRuntime>>) -> Vec<QueueItem> {
     runtime.queue.locked().items().to_vec()

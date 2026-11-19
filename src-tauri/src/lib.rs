@@ -155,6 +155,7 @@ pub fn run() {
             commands::pick_library_folder,
             commands::scan_library,
             fetch::commands::fetch_availability,
+            fetch::commands::fetch_search,
             fetch::commands::fetch_jobs,
             fetch::commands::fetch_enqueue,
             fetch::commands::fetch_cancel,

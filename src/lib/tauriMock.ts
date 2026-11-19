@@ -170,6 +170,15 @@ export function installTauriMock() {
     scan_library: () => library,
     // File de téléchargements : aucun outil dans le navigateur.
     fetch_availability: () => ({ spotdl: false, ytdlp: false }),
+    // Recherche de la page Télécharger : quelques résultats de démonstration (rien ne se télécharge).
+    fetch_search: ({ query }) =>
+      ["Version originale", "Clip officiel", "En concert", "Paroles"].map((kind, i) => ({
+        title: `${String(query)} (${kind})`,
+        artist: i % 2 ? "Chaîne de démonstration" : "Artiste de démonstration",
+        duration_secs: 180 + i * 17,
+        url: `https://www.youtube.com/watch?v=demo${String(i).padStart(7, "0")}`,
+        thumbnail: null,
+      })),
     fetch_jobs: () => [],
     fetch_enqueue: () => [],
     fetch_cancel: () => undefined,
