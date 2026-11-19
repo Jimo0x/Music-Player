@@ -288,6 +288,13 @@ watch(
   () => [playlists.items, favorites.ids],
   () => sync.localChange(),
 );
+// Une synchronisation écartée pendant le scan (tout semblerait absent) reprend à sa fin.
+watch(
+  () => library.scanning,
+  (scanning, before) => {
+    if (before && !scanning) void sync.check();
+  },
+);
 const offPlayback: (() => void)[] = [];
 const onPopState = () => ui.onPopState();
 let saveInterval: ReturnType<typeof setInterval> | null = null;
