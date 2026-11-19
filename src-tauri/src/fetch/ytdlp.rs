@@ -51,12 +51,16 @@ impl Source for YtDlpSource {
     }
 
     fn available(&self) -> bool {
-        resolve_runner(&AtomicBool::new(false)).is_ok()
+        // Téléphone : yt-dlp intégré (Python), téléchargé à la première utilisation.
+        cfg!(target_os = "android") || resolve_runner(&AtomicBool::new(false)).is_ok()
     }
 
     fn fetch(&self, wanted: &Wanted, dest_dir: &Path, cancel: &AtomicBool) -> Result<PathBuf, JobError> {
         if cancel.load(Ordering::Relaxed) {
             return Err(JobError::Cancelled);
+        }
+        if cfg!(target_os = "android") {
+            return fetch_on_phone(wanted, dest_dir, cancel);
         }
         let runner = resolve_runner(cancel)?;
         let query = if wanted.url.is_some() {
@@ -108,6 +112,37 @@ fn resolve_runner(cancel: &AtomicBool) -> Result<Runner, JobError> {
     }
     let detail = last_error.unwrap_or_else(|| "yt-dlp est introuvable. Installez-le séparément puis redémarrez Music Player.".to_owned());
     Err(JobError::ToolMissing(truncate_log(&detail)))
+}
+
+/// Téléphone : mêmes étapes que sur ordinateur (5 candidats, notre choix, téléchargement),
+/// par yt-dlp dans Python (fetch/android.rs). Le fichier garde son format (.m4a le plus souvent).
+fn fetch_on_phone(wanted: &Wanted, dest_dir: &Path, cancel: &AtomicBool) -> Result<PathBuf, JobError> {
+    use super::android;
+    let zip = super::ytdlp_zip::ensure(android::data_dir()?)?;
+    let (url, chosen) = match wanted.direct_url() {
+        Some(url) => (url.to_owned(), None),
+        None if wanted.url.is_some() => return Err(JobError::Failed("Ce lien n'est pas une adresse web valable (http ou https).".to_owned())),
+        None => {
+            let candidates = parse_candidates(&android::search(&zip, &make_query(wanted)?)?);
+            let chosen = pick_candidate(wanted, &candidates).ok_or(JobError::NotFound)?.clone();
+            (chosen.url.clone(), Some(chosen))
+        }
+    };
+    if cancel.load(Ordering::Relaxed) {
+        return Err(JobError::Cancelled);
+    }
+    let attempt_dir = create_attempt_directory(dest_dir)?;
+    let result = android::download(&zip, &url, &attempt_dir, cancel);
+    // Sans ffmpeg, yt-dlp n'écrit pas d'étiquettes : celles du candidat choisi, pour que la
+    // vérification de l'import compare la même chose que sur ordinateur.
+    if let (Ok(path), Some(chosen)) = (&result, &chosen) {
+        let tags = Wanted { title: chosen.title.clone(), artist: chosen.artist.clone(), album: String::new(), duration_secs: None, playlist_id: None, url: None };
+        super::import::retag(path, &tags);
+    }
+    if result.is_err() {
+        cleanup_attempt(&attempt_dir);
+    }
+    result
 }
 
 /// Résultat de recherche YouTube, avant tout téléchargement.

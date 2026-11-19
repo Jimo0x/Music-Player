@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod android;
 pub mod commands;
 pub mod common;
 pub mod import;
@@ -12,6 +13,7 @@ pub mod source;
 pub mod spotdl;
 pub mod spotify_embed;
 pub mod ytdlp;
+pub mod ytdlp_zip;
 
 /// Morceau à télécharger, tel que la personne l'a demandé (import Spotify, sélection…).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

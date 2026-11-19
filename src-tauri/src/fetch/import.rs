@@ -58,7 +58,7 @@ fn import_downloaded_file(downloaded: &Path, wanted: &Wanted, library_root: &Pat
         library::tidy_video_title(&mut named);
         let from_tags = Wanted { title: named.title.clone(), artist: named.artist.clone(), ..wanted.clone() };
         let unknown = named.artist == library::UNKNOWN_ARTIST;
-        let file_name = requested_file_name(&Wanted { artist: if unknown { String::new() } else { from_tags.artist.clone() }, ..from_tags });
+        let file_name = same_extension(requested_file_name(&Wanted { artist: if unknown { String::new() } else { from_tags.artist.clone() }, ..from_tags }), downloaded);
         let destination = available_destination(library_root, &file_name)?;
         fs::rename(downloaded, &destination)
             .map_err(|error| JobError::Failed(format!("Impossible de déplacer le morceau dans la bibliothèque : {error}")))?;
@@ -88,7 +88,7 @@ fn import_downloaded_file(downloaded: &Path, wanted: &Wanted, library_root: &Pat
         retag(downloaded, wanted);
     }
 
-    let destination = available_destination(library_root, &requested_file_name(wanted))?;
+    let destination = available_destination(library_root, &same_extension(requested_file_name(wanted), downloaded))?;
     fs::rename(downloaded, &destination)
         .map_err(|error| JobError::Failed(format!("Impossible de déplacer le morceau dans la bibliothèque : {error}")))?;
 
@@ -99,8 +99,18 @@ fn import_downloaded_file(downloaded: &Path, wanted: &Wanted, library_root: &Pat
     })
 }
 
+/// Nom demandé (« Artiste - Titre.mp3 ») avec l'extension réelle du fichier téléchargé : sur
+/// téléphone, sans ffmpeg, le son arrive tel que YouTube le sert (.m4a le plus souvent).
+fn same_extension(name: String, downloaded: &Path) -> String {
+    let ext = downloaded.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).unwrap_or_default();
+    match (name.strip_suffix(".mp3"), ext.as_str()) {
+        (Some(stem), "m4a" | "webm" | "opus" | "ogg" | "aac" | "flac" | "wav") => format!("{stem}.{ext}"),
+        _ => name,
+    }
+}
+
 /// Titre, artiste et album demandés écrits dans le fichier (au mieux).
-fn retag(path: &Path, wanted: &Wanted) {
+pub(super) fn retag(path: &Path, wanted: &Wanted) {
     use lofty::config::WriteOptions;
     use lofty::file::{AudioFile, TaggedFileExt};
     use lofty::tag::{Accessor, Tag};
@@ -148,11 +158,18 @@ fn available_destination(root: &Path, requested_name: &str) -> Result<PathBuf, J
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn keeps_the_real_extension_of_the_download() {
+        assert_eq!(same_extension("Damso - Θ.mp3".into(), Path::new("/t/x.m4a")), "Damso - Θ.m4a");
+        assert_eq!(same_extension("Damso - Θ.mp3".into(), Path::new("/t/x.mp3")), "Damso - Θ.mp3");
+        assert_eq!(same_extension("Damso - Θ.mp3".into(), Path::new("/t/x.exe")), "Damso - Θ.mp3");
+    }
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::sync::atomic::AtomicBool;
 
-    use super::{available_destination, download_and_import, remove_attempt_dir, STAGING_DIR};
+    use super::{available_destination, download_and_import, remove_attempt_dir, same_extension, STAGING_DIR};
     use crate::fetch::common::create_attempt_directory;
     use crate::fetch::source::Source;
     use crate::fetch::{JobError, Wanted};

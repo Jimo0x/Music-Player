@@ -65,6 +65,8 @@ pub fn run() {
 
             let mut state = AppState::new(data_dir.clone());
             state.music_dir = sharing::public_music_dir(app.path().audio_dir().ok());
+            // Téléphone : yt-dlp est rangé dans les données de l'appli (fetch/ytdlp_zip.rs).
+            fetch::android::set_data_dir(&data_dir);
             let library_root = commands::restore_state(&state, &data_dir);
             // Morceaux reçus avant la 0.5.16, cachés dans le dossier privé : rangés dans le
             // dossier visible, avant le scan qui les y retrouvera.

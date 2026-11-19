@@ -18,7 +18,10 @@
 //   ouverture de l'installateur d'Android (installation par-dessus, même signature) ;
 // - personnalisation : icône de l'écran d'accueil au choix (une « activity-alias » par
 //   icône dessinée, une seule active), raccourci épinglé avec une photo de l'utilisateur,
-//   mode sombre du téléphone transmis à la page (window.AndroidLook).
+//   mode sombre du téléphone transmis à la page (window.AndroidLook) ;
+// - téléchargement sur téléphone : Python (Chaquopy) et notre module mp_ytdlp.py, appelés
+//   depuis Rust par JNI (YtDlpBridge, fetch/android.rs) ; yt-dlp lui-même est téléchargé et mis
+//   à jour par l'appli (fetch/ytdlp_zip.rs).
 // Lancé par la CI après `tauri android init` et `tauri icon`, avant `tauri android build`.
 
 import fs from "node:fs";
@@ -254,6 +257,8 @@ ${edgeToEdge ? "    enableEdgeToEdge()\n" : ""}    super.onCreate(savedInstanceS
     contentResolver.registerContentObserver(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, true, mediaObserver)
     handleOpenIntent(intent)
     Updates.schedule(this)
+    // Téléchargement sur téléphone : Python (yt-dlp) démarré à la première utilisation.
+    YtDlpBridge.init(applicationContext)
     // Notifications instantanées choisies par la personne : le service repart à chaque ouverture.
     if (ProchesWatch.prefs(this).getBoolean("instant", false)) ProchesService.start(this)
   }
@@ -1815,6 +1820,104 @@ fs.writeFileSync(
     <path android:fillColor="#FFFFFFFF"
         android:pathData="M12,3v10.55c-0.59,-0.34 -1.27,-0.55 -2,-0.55 -2.21,0 -4,1.79 -4,4s1.79,4 4,4 4,-1.79 4,-4V7h4V3h-6z" />
 </vector>
+`,
+);
+
+// Téléchargement sur téléphone : Python 3.11 (Chaquopy 17.2.0, MIT ; 3.11 est la dernière
+// version offerte pour les quatre types de processeurs, armv7 compris) et yt-dlp.
+const androidDir = path.resolve("src-tauri/gen/android");
+const rootGradlePath = path.join(androidDir, "build.gradle.kts");
+let rootGradle = fs.readFileSync(rootGradlePath, "utf8");
+if (!rootGradle.includes("com.chaquo.python")) {
+  const patched = rootGradle.replace(/(classpath\("com\.android\.tools\.build:gradle:[^"]+"\))/, '$1\n        classpath("com.chaquo.python:gradle:17.2.0")');
+  if (patched === rootGradle) {
+    console.error("build.gradle.kts : déclaration du plugin Android introuvable (Chaquopy non ajouté).");
+    process.exit(1);
+  }
+  fs.writeFileSync(rootGradlePath, patched);
+}
+const appGradlePath = path.join(androidDir, "app", "build.gradle.kts");
+let appGradle = fs.readFileSync(appGradlePath, "utf8");
+if (!appGradle.includes("com.chaquo.python")) {
+  const patched = appGradle.replace(/(id\("rust"\))/, '$1\n    id("com.chaquo.python")');
+  if (patched === appGradle) {
+    console.error("app/build.gradle.kts : bloc plugins introuvable (Chaquopy non ajouté).");
+    process.exit(1);
+  }
+  appGradle = `${patched}
+chaquopy {
+    defaultConfig {
+        version = "3.11"
+        // Pas de Python sur la machine de compilation : les sources partent telles quelles.
+        pyc {
+            src = false
+        }
+    }
+}
+`;
+  fs.writeFileSync(appGradlePath, appGradle);
+}
+const pythonDir = path.join(root, "python");
+fs.mkdirSync(pythonDir, { recursive: true });
+fs.copyFileSync(path.resolve("src-tauri/android/python/mp_ytdlp.py"), path.join(pythonDir, "mp_ytdlp.py"));
+fs.writeFileSync(
+  path.join(kotlinDir, "YtDlpBridge.kt"),
+  `package ${pkg}
+
+import android.content.Context
+import com.chaquo.python.PyObject
+import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
+
+/**
+ * Téléchargement sur téléphone : appelé par Rust (JNI, src-tauri/src/fetch/android.rs), fait
+ * tourner yt-dlp dans Python (Chaquopy) par notre module mp_ytdlp.py. Les erreurs reviennent
+ * en texte (« ERREUR:… ») plutôt qu'en exceptions, plus simples à traverser par JNI.
+ */
+object YtDlpBridge {
+  @Volatile private var context: Context? = null
+
+  fun init(ctx: Context) {
+    context = ctx.applicationContext
+  }
+
+  private fun module(): PyObject {
+    val ctx = context ?: throw IllegalStateException("Appli pas encore prête")
+    synchronized(this) {
+      if (!Python.isStarted()) Python.start(AndroidPlatform(ctx))
+    }
+    return Python.getInstance().getModule("mp_ytdlp")
+  }
+
+  private fun text(block: () -> String): String =
+    try {
+      block()
+    } catch (e: Throwable) {
+      "ERREUR:" + (e.message ?: e.toString())
+    }
+
+  @JvmStatic
+  fun search(zip: String, query: String): String = text { module().callAttr("search", zip, query).toString() }
+
+  @JvmStatic
+  fun download(zip: String, url: String, dir: String): String = text { module().callAttr("download", zip, url, dir).toString() }
+
+  @JvmStatic
+  fun progress(): Double =
+    try {
+      module().callAttr("progress").toDouble()
+    } catch (e: Throwable) {
+      -1.0
+    }
+
+  @JvmStatic
+  fun cancel() {
+    try {
+      module().callAttr("cancel")
+    } catch (e: Throwable) {
+    }
+  }
+}
 `,
 );
 

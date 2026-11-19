@@ -32,6 +32,8 @@ const data = ref<SpotifyExport | null>(null);
 const fileNames = ref<string[]>([]);
 const reading = ref(false);
 const readError = ref<string | null>(null);
+/** Playlist coupée par Spotify (100 premiers morceaux). */
+const readNotice = ref<string | null>(null);
 const chosen = reactive<Record<number, boolean>>({});
 const importLiked = ref(true);
 const open = reactive<Record<string, boolean>>({});
@@ -90,7 +92,6 @@ watch(
 );
 
 onMounted(async () => {
-  if (isAndroid) return;
   // Les tâches déjà terminées avant l'ouverture de la vue ne déclenchent rien.
   await fetchStore.initialize();
   for (const job of fetchStore.jobs) if (job.state === "done") seenDone.add(job.id);
@@ -109,12 +110,13 @@ function setData(next: SpotifyExport, names: string[]) {
 
 async function readLink() {
   const url = link.value.trim();
-  if (isAndroid || reading.value || !url) return;
+  if (reading.value || !url) return;
   reading.value = true;
   readError.value = null;
   try {
     const result = await api.fetchReadLink(url);
     setData({ playlists: [{ name: result.name, tracks: result.tracks }], liked: [] }, ["Lien Spotify"]);
+    readNotice.value = result.partial ? "Spotify n'a donné que les 100 premiers morceaux de cette playlist. Pour la liste complète : importe tes données Spotify (ci-dessus), ou installe spotDL sur ordinateur." : null;
   } catch (error) {
     readError.value = `Lecture du lien impossible : ${String(error)}`;
   } finally {
@@ -261,15 +263,14 @@ async function copyMissing(list: MatchedPlaylist[]) {
               spellcheck="false"
               placeholder="https://open.spotify.com/playlist/…"
               aria-label="Lien Spotify (playlist, album ou morceau)"
-              :disabled="isAndroid || reading"
+              :disabled="reading"
             />
-            <button type="submit" class="pill pill-accent" :disabled="isAndroid || reading || !link.trim()">
+            <button type="submit" class="pill pill-accent" :disabled="reading || !link.trim()">
               {{ reading ? "Lecture…" : "Lire" }}
             </button>
           </form>
           <p class="muted small">
-            <template v-if="isAndroid">L'import par lien est disponible sur PC avec spotDL installé. Sur téléphone, utilisez vos données Spotify ou un fichier.</template>
-            <template v-else>Playlist, album ou morceau. Une playlist privée n'est pas lisible : rendez-la publique, ou utilisez vos données Spotify.</template>
+            Playlist, album ou morceau. Une playlist privée n'est pas lisible : rendez-la publique, ou utilisez vos données Spotify.
           </p>
         </div>
 
@@ -295,6 +296,7 @@ async function copyMissing(list: MatchedPlaylist[]) {
 
       <input ref="fileInput" class="file-input" type="file" multiple :disabled="reading" @change="pick" />
       <p v-if="readError" class="error">{{ readError }}</p>
+      <p v-else-if="readNotice" class="notice" role="status">{{ readNotice }}</p>
     </section>
 
     <template v-if="data">
@@ -314,16 +316,14 @@ async function copyMissing(list: MatchedPlaylist[]) {
         </div>
       </div>
 
-      <section v-if="totals.missing && isAndroid" class="spotdl card">
-        <p>Le téléchargement des morceaux manquants est disponible uniquement sur PC pour le moment. Tu peux quand même importer les morceaux déjà présents dans la bibliothèque.</p>
-      </section>
-      <section v-else-if="totals.missing || fetchStore.jobs.length" class="spotdl card">
+      <section v-if="totals.missing || fetchStore.jobs.length" class="spotdl card">
         <h2>Télécharger les morceaux manquants</h2>
         <p>
           Chaque morceau est cherché avec spotDL, puis yt-dlp si besoin. La source audio est YouTube : le résultat peut
           différer de l'enregistrement Spotify, et un résultat trop éloigné du titre demandé n'est pas ajouté.
         </p>
-        <p class="muted small">Sur Windows, installe Python puis <code>py -m pip install -U spotdl</code>. Installe FFmpeg avec <code>spotdl --download-ffmpeg</code> (Deno est recommandé avec <code>spotdl --download-deno</code>). Redémarre Music Player après l'installation.</p>
+        <p v-if="isAndroid" class="muted small">Sur téléphone, yt-dlp est intégré à l'appli : il se télécharge à la première utilisation et se met à jour tout seul.</p>
+        <p v-else class="muted small">Sur Windows, installe Python puis <code>py -m pip install -U spotdl</code>. Installe FFmpeg avec <code>spotdl --download-ffmpeg</code> (Deno est recommandé avec <code>spotdl --download-deno</code>). Redémarre Music Player après l'installation.</p>
         <p v-if="fetchStore.initialized && !fetchStore.anyTool" class="error">
           Ni spotDL ni yt-dlp n'a été trouvé sur ce PC. Installe-en un, puis
           <button type="button" class="link" @click="fetchStore.refreshAvailability()">vérifie à nouveau</button>.
@@ -371,7 +371,7 @@ async function copyMissing(list: MatchedPlaylist[]) {
       <section v-for="(p, i) in matched" :key="`${p.name}-${i}`" class="row-card" :class="{ off: !p.found.length }">
         <label class="toggle">
           <!-- Une playlist sans aucun morceau local reste cochable : ses absents peuvent être téléchargés. -->
-          <input v-model="chosen[i]" type="checkbox" :disabled="!p.found.length && (isAndroid || !p.missing.length)" />
+          <input v-model="chosen[i]" type="checkbox" :disabled="!p.found.length && !p.missing.length" />
           <span class="name">{{ p.name }}</span>
         </label>
         <span class="count" :class="{ full: !p.missing.length }">{{ p.found.length }} / {{ p.found.length + p.missing.length }}</span>
@@ -391,6 +391,11 @@ async function copyMissing(list: MatchedPlaylist[]) {
 </template>
 
 <style scoped>
+.notice {
+  margin: var(--space-2) 0 0;
+  color: var(--warning);
+  font-size: 13px;
+}
 .card {
   padding: var(--space-4) 18px;
   border-radius: var(--radius-lg);

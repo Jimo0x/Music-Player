@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Compilation Android sur ce PC (mêmes étapes que la CI, .github/workflows/ci.yml), pour essayer
-# sur l'émulateur avant de pousser. Outils installés dans C:\Android (JDK 17, SDK, NDK, émulateur).
+# sur l'émulateur avant de pousser. Android Studio (SDK, NDK, émulateur « MusicPlayer_API34 »).
 #
 #   scripts/android-local.sh                  APK x86_64 (émulateur)
 #   scripts/android-local.sh aarch64          APK pour un vrai téléphone (cible Rust à ajouter :
@@ -12,10 +12,14 @@ TARGET="${1:-x86_64}"
 INSTALL="${2:-}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-export JAVA_HOME='C:\Android\jdk-17'
-export ANDROID_HOME='C:\Android\sdk'
-export NDK_HOME='C:\Android\sdk\ndk\30.0.16248370'
-export PATH="/c/Android/jdk-17/bin:/c/Android/sdk/platform-tools:$PATH"
+# SDK installé par Android Studio (emplacement par défaut), Java fourni avec Android Studio.
+SDK_DIR="$(cygpath -w "$LOCALAPPDATA/Android/Sdk")"
+export JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'
+export ANDROID_HOME="$SDK_DIR"
+NDK_VERSION="$(ls "$LOCALAPPDATA/Android/Sdk/ndk" 2>/dev/null | sort -V | tail -n 1)"
+[ -n "$NDK_VERSION" ] || { echo "NDK absent : Android Studio → SDK Manager → SDK Tools → NDK (Side by side)." >&2; exit 1; }
+export NDK_HOME="$(cygpath -w "$LOCALAPPDATA/Android/Sdk/ndk/$NDK_VERSION")"
+export PATH="/c/Program Files/Android/Android Studio/jbr/bin:$LOCALAPPDATA/Android/Sdk/platform-tools:$PATH"
 
 cd "$ROOT"
 # Projet Android généré une fois (src-tauri/gen/android, hors git), puis complété comme en CI.

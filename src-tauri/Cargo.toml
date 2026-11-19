@@ -64,6 +64,10 @@ opus-decoder = "0.1"
 # Dolby Digital / Dolby Digital Plus (AC-3, E-AC-3) en Rust pur, Android compris (dolby.rs).
 # MIT ou Apache-2.0.
 filmcraft-ac3 = "0.9"
+# Téléchargement sur téléphone : appel de Kotlin (Python + yt-dlp) depuis Rust (fetch/android.rs).
+# Mêmes versions que Tauri sur Android ; compilées partout pour vérifier le pont.
+jni = "0.21"
+ndk-context = "0.1"
 ogg = "0.9"
 
 # Mise à jour automatique depuis les versions GitHub (ordinateur seulement).

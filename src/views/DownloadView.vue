@@ -9,7 +9,8 @@ import FetchJobs from "@/components/FetchJobs.vue";
 import Icon from "@/components/Icon.vue";
 
 // Télécharger sans passer par l'import Spotify : un lien (YouTube, SoundCloud… lu par
-// yt-dlp ; Spotify, morceau ou playlist, lu par spotDL) ou une recherche « Artiste - Titre ».
+// yt-dlp), un lien Spotify (morceau, album ou playlist, lu sans spotDL puis chaque morceau
+// cherché) ou une recherche « Artiste - Titre ». Sur téléphone, yt-dlp est intégré à l'appli.
 const fetchStore = useFetchStore();
 const playlists = usePlaylistsStore();
 const ui = useUiStore();
@@ -19,9 +20,10 @@ const input = ref("");
 const playlistId = ref("");
 const busy = ref(false);
 const error = ref<string | null>(null);
+/** Playlist coupée par Spotify (100 premiers morceaux). */
+const notice = ref<string | null>(null);
 
 onMounted(() => {
-  if (isAndroid) return;
   void fetchStore.initialize();
   void fetchStore.refreshAvailability();
 });
@@ -37,7 +39,7 @@ const kind = computed<"spotify" | "link" | "search" | null>(() => {
 const hint = computed(() => {
   switch (kind.value) {
     case "spotify":
-      return fetchStore.availability.spotdl ? "Lien Spotify : chaque morceau sera cherché puis téléchargé." : "Les liens Spotify demandent spotDL.";
+      return fetchStore.anyTool ? "Lien Spotify : chaque morceau sera cherché puis téléchargé." : "Les liens Spotify demandent yt-dlp ou spotDL.";
     case "link":
       return fetchStore.availability.ytdlp ? "Lien direct : le son sera téléchargé tel quel." : "Les liens directs demandent yt-dlp.";
     case "search":
@@ -49,7 +51,7 @@ const hint = computed(() => {
 
 const canSubmit = computed(() => {
   if (busy.value || !kind.value) return false;
-  if (kind.value === "spotify") return fetchStore.availability.spotdl;
+  if (kind.value === "spotify") return fetchStore.anyTool;
   if (kind.value === "link") return fetchStore.availability.ytdlp;
   return fetchStore.anyTool;
 });
@@ -67,10 +69,12 @@ async function submit() {
   const target = playlistId.value || null;
   busy.value = true;
   error.value = null;
+  notice.value = null;
   try {
     let wanted: FetchWanted[];
     if (kind.value === "spotify") {
       const list = await api.fetchReadLink(text);
+      if (list.partial) notice.value = "Spotify n'a donné que les 100 premiers morceaux de cette playlist. Pour la liste complète : importe tes données Spotify (page « Importer de Spotify »), ou installe spotDL sur ordinateur.";
       wanted = list.tracks.map((t) => ({ title: t.title, artist: t.artist, album: t.album, duration_secs: t.duration_secs, playlist_id: target }));
     } else if (kind.value === "link") {
       wanted = [{ title: "", artist: "", url: text, playlist_id: target }];
@@ -97,11 +101,6 @@ async function submit() {
     <h1 class="page-title">Télécharger</h1>
     <p class="page-sub">Un lien ou une recherche : le morceau arrive dans la bibliothèque.</p>
 
-    <section v-if="isAndroid" class="card">
-      <p>Le téléchargement sur téléphone arrive avec le moteur intégré (en préparation). En attendant, télécharge depuis le PC : les morceaux arrivent sur le téléphone par « Mes appareils ».</p>
-    </section>
-
-    <template v-else>
       <form class="card form" @submit.prevent="submit">
         <label class="field">
           <span class="muted small">Lien YouTube, SoundCloud, Spotify… ou « Artiste - Titre »</span>
@@ -121,9 +120,13 @@ async function submit() {
         </div>
         <p v-if="hint" class="muted small">{{ hint }}</p>
         <p v-if="error" class="error" role="alert">{{ error }}</p>
+        <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       </form>
 
-      <section class="card tools">
+      <section v-if="isAndroid" class="card tools">
+        <p class="small muted">yt-dlp est intégré à l'appli : il se télécharge à la première utilisation (3 Mo) et se met à jour tout seul. Les morceaux arrivent en .m4a, lus directement par l'appli.</p>
+      </section>
+      <section v-else class="card tools">
         <p class="small">
           <span :class="fetchStore.availability.ytdlp ? 'ok' : 'missing'">yt-dlp {{ fetchStore.availability.ytdlp ? "trouvé" : "absent" }}</span>
           ·
@@ -143,7 +146,6 @@ async function submit() {
         <p v-if="fetchStore.active.length" class="muted small">{{ fetchStore.active.length }} en cours ou en attente · la file continue si tu quittes cette page.</p>
         <FetchJobs />
       </section>
-    </template>
   </div>
 </template>
 
@@ -204,6 +206,11 @@ async function submit() {
 .queue-head h2 {
   margin: 0;
   font-size: 16px;
+}
+.notice {
+  margin: 0;
+  color: var(--warning);
+  font-size: 13px;
 }
 .error {
   margin: 0;
