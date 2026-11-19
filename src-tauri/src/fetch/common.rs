@@ -38,7 +38,7 @@ pub fn take_output(attempt_dir: &Path, file_name: &str, tool: &str) -> Result<Pa
         let is_mp3 = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("mp3"));
         if kind.is_file() && !kind.is_symlink() && is_mp3 {
             if produced.is_some() {
-                return Err(JobError::Failed(format!("{tool} a créé plusieurs fichiers pour un seul morceau.")));
+                return Err(JobError::Failed(format!("{tool} a créé plusieurs fichiers pour un seul morceau (lien de playlist ? collez-le dans Télécharger pour en faire un morceau par tâche).")));
             }
             produced = Some(path);
         }

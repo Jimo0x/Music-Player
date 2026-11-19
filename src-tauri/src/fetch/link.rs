@@ -96,6 +96,19 @@ pub fn fetch_read_link(app: tauri::AppHandle, url: String) -> Result<LinkPlaylis
     }
 }
 
+/// Contenu d'un lien direct (playlist, album… lu par yt-dlp) : un morceau par tâche. Liste vide
+/// pour un lien vers un seul son.
+#[derive(Debug, Clone, Serialize)]
+pub struct MediaLink {
+    pub name: String,
+    pub tracks: Vec<super::ytdlp::LinkEntry>,
+}
+
+#[tauri::command(async)]
+pub fn fetch_read_media_link(url: String) -> Result<MediaLink, String> {
+    super::ytdlp::read_media_link(&url).map(|(name, tracks)| MediaLink { name, tracks }).map_err(|error| error.to_string())
+}
+
 /// Lecture complète par spotDL (ordinateur).
 fn read_with_spotdl(app: &tauri::AppHandle, link: &ValidatedLink) -> Result<LinkPlaylist, String> {
     let root = app

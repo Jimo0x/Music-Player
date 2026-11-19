@@ -182,7 +182,9 @@ pub(super) fn parse_candidates(json: &str) -> Vec<Candidate> {
                 .iter()
                 .filter_map(|e| {
                     let url = text(e, "url");
-                    let youtube = url.starts_with("https://www.youtube.com/watch?v=") || url.starts_with("https://music.youtube.com/watch?v=");
+                    let youtube = url.starts_with("https://www.youtube.com/watch?v=")
+                        || url.starts_with("https://music.youtube.com/watch?v=")
+                        || url.starts_with("https://www.youtube.com/shorts/");
                     let channel = if text(e, "channel").is_empty() { text(e, "uploader") } else { text(e, "channel") };
                     (youtube && !url.chars().any(char::is_whitespace)).then(|| Candidate {
                         title: text(e, "title"),
@@ -227,6 +229,70 @@ fn search_candidates(runner: &Runner, search: &str, cancel: &AtomicBool) -> Resu
         Bounded::TimedOut { .. } => Err(JobError::Timeout),
         Bounded::Cancelled { .. } => Err(JobError::Cancelled),
     }
+}
+
+/// Morceau derrière un lien de playlist ou d'album (YouTube, SoundCloud, Audiomack…).
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+pub struct LinkEntry {
+    pub title: String,
+    pub artist: String,
+    pub duration_secs: Option<f64>,
+    pub url: String,
+}
+
+/// Contenu d'un lien direct, sans rien télécharger : (nom, morceaux). Un lien vers un seul son
+/// donne une liste vide : il est téléchargé tel quel. Sans cette lecture, une playlist entière
+/// partait dans une seule tâche (« plusieurs fichiers pour un seul morceau » sur ordinateur,
+/// seul le premier morceau gardé sur téléphone).
+pub fn read_media_link(url: &str) -> Result<(String, Vec<LinkEntry>), JobError> {
+    let wanted = Wanted { title: String::new(), artist: String::new(), album: String::new(), duration_secs: None, playlist_id: None, url: Some(url.to_owned()) };
+    let url = wanted.direct_url().ok_or_else(|| JobError::Failed("Ce lien n'est pas une adresse web valable (http ou https).".to_owned()))?;
+    let cancel = AtomicBool::new(false);
+    let json = if cfg!(target_os = "android") {
+        let zip = super::ytdlp_zip::ensure(super::android::data_dir()?)?;
+        super::android::search(&zip, url)?
+    } else {
+        let runner = resolve_runner(&cancel)?;
+        let mut command = runner.command();
+        command.arg("--ignore-config").arg("--flat-playlist").arg("--dump-single-json").arg("--no-warnings").arg("--").arg(url);
+        match run_command(&mut command, PROBE_TIMEOUT * 6, &cancel)? {
+            Bounded::Finished { status, stdout, .. } if status.success() => stdout,
+            Bounded::Finished { stdout, stderr, .. } => return Err(classify_failure(&stdout, &stderr)),
+            Bounded::TimedOut { .. } => return Err(JobError::Timeout),
+            Bounded::Cancelled { .. } => return Err(JobError::Cancelled),
+        }
+    };
+    Ok(parse_link_entries(&json))
+}
+
+/// Nom et morceaux d'une réponse `--flat-playlist --dump-single-json` (même forme côté
+/// téléphone). Seuls les liens http(s) sans espace sont gardés ; 500 au plus (taille d'un lot).
+pub(super) fn parse_link_entries(json: &str) -> (String, Vec<LinkEntry>) {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else { return (String::new(), Vec::new()) };
+    let text = |e: &serde_json::Value, key: &str| e.get(key).and_then(|v| v.as_str()).map(str::trim).unwrap_or_default().to_owned();
+    let name = text(&value, "title");
+    let entries = value
+        .get("entries")
+        .and_then(|v| v.as_array())
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(|e| {
+                    let url = text(e, "url");
+                    let web = url.starts_with("https://") || url.starts_with("http://");
+                    let channel = if text(e, "channel").is_empty() { text(e, "uploader") } else { text(e, "channel") };
+                    (web && url.len() <= 2000 && !url.chars().any(|c| c.is_whitespace() || c.is_control())).then(|| LinkEntry {
+                        title: text(e, "title"),
+                        artist: channel.trim_end_matches(" - Topic").to_owned(),
+                        duration_secs: e.get("duration").and_then(|v| v.as_f64()).filter(|d| d.is_finite() && *d > 0.0),
+                        url,
+                    })
+                })
+                .take(super::queue::MAX_BATCH_SIZE)
+                .collect()
+        })
+        .unwrap_or_default();
+    (name, entries)
 }
 
 /// Recherche YouTube de 5 candidats (`ytsearch5:`), ou le lien direct demandé.
@@ -352,6 +418,30 @@ mod tests {
 
     fn wanted(title: &str, artist: &str) -> Wanted {
         Wanted { title: title.to_owned(), artist: artist.to_owned(), album: String::new(), duration_secs: Some(180.0), playlist_id: None, url: None }
+    }
+
+    #[test]
+    fn lit_les_morceaux_d_un_lien_de_playlist() {
+        let json = r#"{"_type":"playlist","title":"Ma playlist","entries":[
+            {"title":"Un","channel":"Artiste - Topic","duration":200,"url":"https://www.youtube.com/watch?v=aaa"},
+            {"title":"Deux","uploader":"Autre","url":"https://soundcloud.com/x/deux"},
+            {"title":"Piège","url":"file:///etc/passwd"},
+            {"title":"Espace","url":"https://a b"}]}"#;
+        let (name, entries) = super::parse_link_entries(json);
+        assert_eq!(name, "Ma playlist");
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].artist, "Artiste");
+        assert_eq!(entries[0].duration_secs, Some(200.0));
+        assert_eq!(entries[1].url, "https://soundcloud.com/x/deux");
+        // Un seul son (pas d'« entries ») : rien à éclater, le lien est téléchargé tel quel.
+        assert!(super::parse_link_entries(r#"{"_type":"video","title":"Seul"}"#).1.is_empty());
+        assert!(super::parse_link_entries("pas du json").1.is_empty());
+    }
+
+    #[test]
+    fn garde_les_shorts_parmi_les_candidats() {
+        let json = r#"{"entries":[{"title":"T","channel":"A","duration":50,"url":"https://www.youtube.com/shorts/abc"}]}"#;
+        assert_eq!(parse_candidates(json).len(), 1);
     }
 
     #[test]
