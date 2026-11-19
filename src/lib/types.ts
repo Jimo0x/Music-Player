@@ -248,6 +248,15 @@ export interface FetchAvailability {
   ytdlp: boolean;
 }
 
+/** Résultat de la recherche de la page Télécharger (`fetch::ytdlp::SearchResult`). */
+export interface SearchResult {
+  title: string;
+  artist: string;
+  duration_secs: number | null;
+  url: string;
+  thumbnail: string | null;
+}
+
 export interface FetchJobUpdate {
   id: string;
   state: FetchJobState;
