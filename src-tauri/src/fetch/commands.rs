@@ -227,22 +227,39 @@ fn run_job(app: &tauri::AppHandle, wanted: &Wanted, cancel: &AtomicBool) -> Resu
     let root = PathBuf::from(root);
     // Téléphone : yt-dlp intégré seul ; travail dans les données privées, morceau rangé dans
     // « Musique/Music Player/Téléchargés » (la racine du stockage est interdite d'écriture).
-    if cfg!(target_os = "android") {
+    let (destination, staging) = if cfg!(target_os = "android") {
         let state = app.state::<AppState>();
-        let destination = crate::sharing::downloads_dir(&state);
-        let staging = state.data_dir.join(super::import::STAGING_DIR);
-        return super::import::download_and_import_into(&YtDlpSource, wanted, &destination, &staging, cancel);
-    }
-    // Lien direct : yt-dlp seul (spotDL ne lit que des liens Spotify, résolus avant la file).
-    if wanted.url.is_some() {
-        return download_and_import(&YtDlpSource, wanted, &root, cancel);
-    }
-    match download_and_import(&SpotDlSource, wanted, &root, cancel) {
-        Err(JobError::NotFound | JobError::Failed(_) | JobError::ToolMissing(_)) if !cancel.load(Ordering::Relaxed) => {
-            download_and_import(&YtDlpSource, wanted, &root, cancel)
+        (crate::sharing::downloads_dir(&state), state.data_dir.join(super::import::STAGING_DIR))
+    } else {
+        let staging = root.join(super::import::STAGING_DIR);
+        (root, staging)
+    };
+    let yt_dlp = |wanted: &Wanted| super::import::download_and_import_into(&YtDlpSource, wanted, &destination, &staging, cancel);
+    let first = if cfg!(target_os = "android") || wanted.url.is_some() {
+        // Téléphone : yt-dlp intégré seul. Lien direct : yt-dlp seul (spotDL ne lit que des
+        // liens Spotify, résolus avant la file).
+        yt_dlp(wanted)
+    } else {
+        match download_and_import(&SpotDlSource, wanted, &destination, cancel) {
+            Err(JobError::NotFound | JobError::Failed(_) | JobError::ToolMissing(_)) if !cancel.load(Ordering::Relaxed) => yt_dlp(wanted),
+            other => other,
         }
-        other => other,
+    };
+    // Recherche tapée à l'envers (« Blinding Lights - The Weeknd ») : un essai de plus, titre et
+    // artiste inversés, par yt-dlp. L'erreur du premier essai reste celle montrée.
+    let retry = matches!(first, Err(JobError::NotFound | JobError::Failed(_))) && !cancel.load(Ordering::Relaxed);
+    match swapped_search(wanted) {
+        Some(swapped) if retry => yt_dlp(&swapped).or(first),
+        _ => first,
     }
+}
+
+/// Même recherche, titre et artiste inversés : seulement pour une recherche libre (« X - Y »
+/// tapé dans Télécharger : ni lien, ni durée connue). Un morceau venu de Spotify a sa durée et
+/// ses champs justes : jamais inversé.
+fn swapped_search(wanted: &Wanted) -> Option<Wanted> {
+    let free_search = wanted.url.is_none() && wanted.duration_secs.is_none() && !wanted.artist.trim().is_empty() && !wanted.title.trim().is_empty();
+    free_search.then(|| Wanted { title: wanted.artist.clone(), artist: wanted.title.clone(), ..wanted.clone() })
 }
 
 /// Morceau importé : bibliothèque, playlist demandée, cache, puis l'interface prévenue.
@@ -369,6 +386,18 @@ mod tests {
         assert!(!runtime.worker_running.load(Ordering::Acquire), "fil arrêté, file vide");
         // Chaque tâche : départ puis fin, chacun annoncé à l'interface (tâche + file).
         assert_eq!(notices.lock().unwrap().len(), titles.len() * 4);
+    }
+
+    #[test]
+    fn only_a_free_search_is_tried_the_other_way_round() {
+        let typed = Wanted { title: "The Weeknd".into(), artist: "Blinding Lights".into(), album: String::new(), duration_secs: None, playlist_id: Some("p".into()), url: None };
+        let swapped = super::swapped_search(&typed).expect("recherche libre inversée");
+        assert_eq!((swapped.title.as_str(), swapped.artist.as_str()), ("Blinding Lights", "The Weeknd"));
+        assert_eq!(swapped.playlist_id.as_deref(), Some("p"), "même playlist de destination");
+        // Venu de Spotify (durée connue), sans artiste, ou lien direct : pas d'essai inversé.
+        assert!(super::swapped_search(&Wanted { duration_secs: Some(200.0), ..typed.clone() }).is_none());
+        assert!(super::swapped_search(&Wanted { artist: " ".into(), ..typed.clone() }).is_none());
+        assert!(super::swapped_search(&Wanted { url: Some("https://x".into()), ..typed }).is_none());
     }
 
     #[test]
