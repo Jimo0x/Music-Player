@@ -239,3 +239,35 @@ describe("liaison", () => {
     expect(JSON.stringify(localStorage)).not.toContain("privé");
   });
 });
+
+describe("appareils liés qui ne se synchronisent pas", () => {
+  function linked() {
+    useFriendsStore().me = { code: CODE, secret: SECRET };
+    const sync = useSyncStore();
+    sync.saved = { key: newSyncKey(), lastSync: 0 };
+    return sync;
+  }
+
+  it("dit pourquoi au lieu de ne rien faire (bibliothèque vide ou en cours de lecture)", async () => {
+    const sync = linked();
+    useLibraryStore().tracks = [];
+    expect(await sync.run()).toBe(false);
+    expect(sync.error).toMatch(/Bibliothèque vide/);
+
+    useLibraryStore().tracks = [track("a", "Lemon")];
+    useLibraryStore().scanning = true;
+    expect(await sync.run()).toBe(false);
+    expect(sync.error).toMatch(/Lecture de la bibliothèque/);
+
+    useLibraryStore().scanning = false;
+    expect(await sync.run()).toBe(true);
+    expect(sync.error).toBeNull();
+  });
+
+  it("dit qu'il manque le profil de liaison", async () => {
+    const sync = useSyncStore();
+    sync.saved = { key: newSyncKey(), lastSync: 0 };
+    expect(await sync.run()).toBe(false);
+    expect(sync.error).toMatch(/Profil de liaison absent/);
+  });
+});
