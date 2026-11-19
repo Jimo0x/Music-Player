@@ -35,6 +35,7 @@ fi
 # « tauri icon » réécrit aussi les icônes de src-tauri/icons, suivies par git : remises après.
 npx tauri icon src-tauri/icons/app-icon-source.png > /dev/null
 git checkout -- src-tauri/icons
+git clean -fdq -- src-tauri/icons
 node scripts/android-patch.mjs
 
 npx tauri android build --apk --target "$TARGET"
