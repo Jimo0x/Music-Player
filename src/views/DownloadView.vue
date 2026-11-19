@@ -28,9 +28,19 @@ onMounted(() => {
   void fetchStore.refreshAvailability();
 });
 
-const kind = computed<"spotify" | "link" | "search" | null>(() => {
+/** Lien court du bouton « Partager » de Spotify : il ne mène au morceau qu'après un passage
+ *  par le navigateur, que l'appli ne fait pas. */
+const SHORT_SPOTIFY = /^https?:\/\/(spotify\.link|spoti\.fi)\//i;
+
+/** Ancienne adresse `play.spotify.com` : même lien sous `open.spotify.com` (seule acceptée). */
+function spotifyLink(text: string): string {
+  return text.replace(/^https?:\/\/play\.spotify\.com\//i, "https://open.spotify.com/");
+}
+
+const kind = computed<"spotify" | "short" | "link" | "search" | null>(() => {
   const text = input.value.trim();
   if (!text) return null;
+  if (SHORT_SPOTIFY.test(text)) return "short";
   if (/^https?:\/\/(open|play)\.spotify\.com\//i.test(text) || /^spotify:/i.test(text)) return "spotify";
   if (/^https?:\/\//i.test(text)) return "link";
   return "search";
@@ -40,8 +50,10 @@ const hint = computed(() => {
   switch (kind.value) {
     case "spotify":
       return fetchStore.anyTool ? "Lien Spotify : chaque morceau sera cherché puis téléchargé." : "Les liens Spotify demandent yt-dlp ou spotDL.";
+    case "short":
+      return "Lien court de Spotify : ouvre-le dans le navigateur, puis colle ici l'adresse open.spotify.com qui s'affiche.";
     case "link":
-      return fetchStore.availability.ytdlp ? "Lien direct : le son sera téléchargé tel quel." : "Les liens directs demandent yt-dlp.";
+      return fetchStore.availability.ytdlp ? "Lien direct : le son est téléchargé tel quel (une playlist donne un morceau par tâche)." : "Les liens directs demandent yt-dlp.";
     case "search":
       return "Recherche : le meilleur résultat qui correspond au titre (et à l'artiste) est gardé.";
     default:
@@ -50,7 +62,7 @@ const hint = computed(() => {
 });
 
 const canSubmit = computed(() => {
-  if (busy.value || !kind.value) return false;
+  if (busy.value || !kind.value || kind.value === "short") return false;
   if (kind.value === "spotify") return fetchStore.anyTool;
   if (kind.value === "link") return fetchStore.availability.ytdlp;
   return fetchStore.anyTool;
@@ -73,11 +85,16 @@ async function submit() {
   try {
     let wanted: FetchWanted[];
     if (kind.value === "spotify") {
-      const list = await api.fetchReadLink(text);
+      const list = await api.fetchReadLink(spotifyLink(text));
       if (list.partial) notice.value = "Spotify n'a donné que les 100 premiers morceaux de cette playlist. Pour la liste complète : importe tes données Spotify (page « Importer de Spotify »), ou installe spotDL sur ordinateur.";
       wanted = list.tracks.map((t) => ({ title: t.title, artist: t.artist, album: t.album, duration_secs: t.duration_secs, playlist_id: target }));
     } else if (kind.value === "link") {
-      wanted = [{ title: "", artist: "", url: text, playlist_id: target }];
+      // Playlist ou album : un morceau par tâche (sinon une seule tâche recevait tous les
+      // fichiers et échouait). Lecture impossible : le lien part tel quel, comme avant.
+      const media = await api.fetchReadMediaLink(text).catch(() => null);
+      wanted = media?.tracks.length
+        ? media.tracks.map((t) => ({ title: t.title, artist: t.artist, duration_secs: t.duration_secs, url: t.url, playlist_id: target }))
+        : [{ title: "", artist: "", url: text, playlist_id: target }];
     } else {
       wanted = [{ ...parseSearch(text), playlist_id: target }];
     }
