@@ -111,7 +111,11 @@ fn move_file(from: &Path, to: &Path) -> std::io::Result<()> {
     if fs::rename(from, to).is_ok() {
         return Ok(());
     }
-    fs::copy(from, to)?;
+    if let Err(error) = fs::copy(from, to) {
+        // Copie à moitié faite (stockage plein…) : pas de morceau tronqué dans la bibliothèque.
+        let _ = fs::remove_file(to);
+        return Err(error);
+    }
     let _ = fs::remove_file(from);
     Ok(())
 }
