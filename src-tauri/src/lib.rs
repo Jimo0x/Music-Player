@@ -160,6 +160,7 @@ pub fn run() {
             fetch::commands::fetch_cancel,
             fetch::commands::fetch_clear_finished,
             fetch::link::fetch_read_link,
+            fetch::link::fetch_read_media_link,
             commands::get_library,
             commands::open_audio_file,
             commands::get_cover,
