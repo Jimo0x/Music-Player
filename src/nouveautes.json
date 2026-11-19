@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.10.0",
+    "date": "2026-11-19",
+    "items": [
+      "Téléchargement sur téléphone : un lien ou une recherche « Artiste - Titre », sans rien installer (yt-dlp est intégré et se met à jour tout seul).",
+      "Les morceaux téléchargés sur téléphone sont rangés dans Musique/Music Player/Téléchargés.",
+      "Les liens Spotify (morceau, album, playlist) se lisent sans spotDL, sur ordinateur comme sur téléphone (100 morceaux au plus par playlist, l'appli prévient si la liste est coupée).",
+      "Recherche plus juste : plusieurs résultats sont comparés (titre, artiste, durée) avant de télécharger le bon.",
+      "« Quoi de neuf ? » : les nouveautés s'affichent après chaque mise à jour, et restent dans les Réglages.",
+      "Les listes déroulantes (choix de la playlist…) sont de nouveau lisibles."
+    ]
+  },
+  {
     "version": "0.9.0",
     "date": "2026-11-18",
     "items": [
@@ -38,6 +50,8 @@
   {
     "version": "0.7.0",
     "date": "2026-11-12",
-    "items": ["Mode baladeur sur téléphone : boîtier, molette tactile, 5 finitions, paroles sur petit écran."]
+    "items": [
+      "Mode baladeur sur téléphone : boîtier, molette tactile, 5 finitions, paroles sur petit écran."
+    ]
   }
 ]

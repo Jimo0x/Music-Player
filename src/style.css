@@ -104,6 +104,18 @@ select {
   font: inherit;
   color: inherit;
 }
+/* Choix d'une liste déroulante : le menu est dessiné par le système (fond blanc sous WebView2,
+   même en mode sombre) alors que le texte suit le thème, clair : il devenait illisible. Les
+   choix prennent donc les couleurs du thème, en mode sombre comme en mode clair. */
+select option,
+select optgroup {
+  background-color: var(--bg-elevated);
+  color: var(--text);
+}
+select option:checked {
+  background-color: var(--accent);
+  color: #fff;
+}
 
 :focus-visible {
   outline: 2px solid var(--accent);

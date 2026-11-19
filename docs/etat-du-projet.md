@@ -75,6 +75,8 @@ version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
   14** (« The Weeknd - Blinding Lights » : trouvé, téléchargé en 15 s, ajouté et lu). Reste :
   essai sur un vrai téléphone, APK plus gros (Python, environ +20 Mo par processeur).
 - **Lecteur plein écran sur l'écran verrouillé Android** (option B) : pas commencé.
+- **Plus tard (décision du 19/11)** : appli entièrement traduisible (Français / English / langue
+  du système), environ 1 200 textes (870 dans l'interface, 340 messages du moteur Rust).
 - **Ensuite (demande du propriétaire)** : revue de sécurité, puis optimisation poussée, une
   fois toutes les fonctions confirmées sur appareils.
 
