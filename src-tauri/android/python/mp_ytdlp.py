@@ -57,7 +57,8 @@ def search(zip_path, query):
                 "url": e.get("url"),
             }
         )
-    return json.dumps({"entries": entries})
+    # Nom de la playlist ou de l'album (lien lu par fetch_read_media_link), vide pour une recherche.
+    return json.dumps({"title": info.get("title") or "", "entries": entries})
 
 
 def _hook(d):
