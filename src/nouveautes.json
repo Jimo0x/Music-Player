@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.10.1",
+    "date": "2026-11-20",
+    "items": [
+      "Télécharger : un lien de playlist ou d'album (YouTube, SoundCloud…) donne un morceau par téléchargement, et un son partagé depuis un Mix YouTube reste un seul son.",
+      "Télécharger : une recherche avec le titre seul (« Blinding Lights ») trouve le morceau.",
+      "Télécharger : les liens Spotify courts (spotify.link) expliquent quoi faire, et les anciens liens play.spotify.com marchent.",
+      "Appareils liés : la synchronisation dit pourquoi elle attend, et reprend dès le retour dans l'appli."
+    ]
+  },
+  {
     "version": "0.10.0",
     "date": "2026-11-19",
     "items": [
