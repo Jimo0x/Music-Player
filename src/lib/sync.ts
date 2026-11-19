@@ -9,7 +9,7 @@
 import { type CopyRequest, type DeviceInventory, mergeCopies, mergeDevices } from "./devices";
 import { LibraryMatcher } from "./spotifyImport";
 import type { BackupTrack } from "./backup";
-import { relay } from "./friendsApi";
+import { relay, RelayError } from "./friendsApi";
 import type { Listen } from "./recap";
 import type { Playlist, PlaylistStyle, Track } from "./types";
 
@@ -328,8 +328,13 @@ export async function downloadDoc(id: SyncIdentity): Promise<{ doc: SyncDoc; ver
   if (!first) return null;
   const parts = [first.data];
   for (let n = 1; n < first.total; n++) {
-    const next = await relay.syncRead(id.base, id.code, id.secret, n);
-    if (next.version !== first.version) throw new Error("Un autre appareil vient de publier.");
+    // Nouvelle version plus courte publiée entre deux lectures : ce morceau n'existe plus (400).
+    const next = await relay.syncRead(id.base, id.code, id.secret, n).catch((e: unknown) => {
+      if (e instanceof RelayError && e.status === 400) throw new RelayError("Un autre appareil vient de publier.", 409);
+      throw e;
+    });
+    // Même cas qu'un envoi refusé (409) : le tour recommence avec le nouvel état.
+    if (next.version !== first.version) throw new RelayError("Un autre appareil vient de publier.", 409);
     parts.push(next.data);
   }
   return { doc: parseDoc(await decrypt(id.key, parts.join(""))), version: first.version };
