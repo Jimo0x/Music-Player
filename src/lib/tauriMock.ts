@@ -174,6 +174,7 @@ export function installTauriMock() {
     fetch_enqueue: () => [],
     fetch_cancel: () => undefined,
     fetch_clear_finished: () => 0,
+    fetch_read_media_link: () => ({ name: "", tracks: [] }),
     fetch_read_link: () => {
       throw "L'import par lien demande l'application de bureau avec spotDL.";
     },

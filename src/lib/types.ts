@@ -254,6 +254,12 @@ export interface FetchJobUpdate {
   error: string | null;
 }
 
+/** Contenu d'un lien direct lu par yt-dlp (`fetch::link::MediaLink`) : vide pour un seul son. */
+export interface MediaLink {
+  name: string;
+  tracks: { title: string; artist: string; duration_secs: number | null; url: string }[];
+}
+
 /** Playlist lue depuis un lien Spotify (`fetch::link::LinkPlaylist`). */
 export interface LinkPlaylist {
   name: string;
