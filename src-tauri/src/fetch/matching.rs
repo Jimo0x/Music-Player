@@ -56,16 +56,21 @@ pub fn score_match(wanted: TrackInfo<'_>, candidate: TrackInfo<'_>) -> MatchScor
     let candidate_words = words(candidate.title);
     let wanted_artist = tokens(&words(wanted.artist));
     let wanted_title = tokens(&wanted_words);
+    let candidate_artist = tokens(&words(candidate.artist));
+    // Recherche sans artiste (« Blinding Lights ») : l'artiste n'est pas exigé, et celui du
+    // candidat (sa chaîne) est retiré de son titre comme l'aurait été l'artiste demandé.
+    let artist_known = !wanted_artist.is_empty();
+    let artist_words = if artist_known { &wanted_artist } else { &candidate_artist };
 
     // Le titre du candidat, débarrassé de ce qui n'est pas le titre : l'artiste répété
     // (« Damso - Bruxelles vie ») et une année ajoutée (« Remastered 2011 »).
     let candidate_title: HashSet<String> = tokens(&candidate_words)
         .into_iter()
-        .filter(|w| wanted_title.contains(w) || !(wanted_artist.contains(w) || is_year(w)))
+        .filter(|w| wanted_title.contains(w) || !(artist_words.contains(w) || is_year(w)))
         .collect();
 
     let title_similarity = token_similarity(&wanted_title, &candidate_title);
-    let artist_similarity = token_similarity(&wanted_artist, &tokens(&words(candidate.artist)));
+    let artist_similarity = token_similarity(&wanted_artist, &candidate_artist);
 
     let wanted_duration = valid_duration(wanted.duration_secs);
     let duration_delta_secs = wanted_duration
@@ -81,10 +86,11 @@ pub fn score_match(wanted: TrackInfo<'_>, candidate: TrackInfo<'_>) -> MatchScor
     };
 
     let version_mismatch = version_flags(&wanted_words) != version_flags(&candidate_words);
-    let total = if wanted_duration.is_some() {
-        title_similarity * 0.56 + artist_similarity * 0.32 + duration_similarity * 0.12
-    } else {
-        title_similarity * 0.64 + artist_similarity * 0.36
+    let total = match (artist_known, wanted_duration.is_some()) {
+        (true, true) => title_similarity * 0.56 + artist_similarity * 0.32 + duration_similarity * 0.12,
+        (true, false) => title_similarity * 0.64 + artist_similarity * 0.36,
+        (false, true) => title_similarity * 0.85 + duration_similarity * 0.15,
+        (false, false) => title_similarity,
     };
 
     let duration_is_acceptable = match (wanted_duration, duration_delta_secs) {
@@ -96,7 +102,7 @@ pub fn score_match(wanted: TrackInfo<'_>, candidate: TrackInfo<'_>) -> MatchScor
     let accepted = !wanted_title.is_empty()
         && !candidate_title.is_empty()
         && title_similarity >= 0.68
-        && artist_similarity >= 0.50
+        && (!artist_known || artist_similarity >= 0.50)
         && total >= 0.68
         && duration_is_acceptable
         && !version_mismatch;
@@ -275,6 +281,19 @@ mod tests {
         let wanted = info("Slow Dancing in the Dark", "Joji", Some(209.0));
         assert!(score_match(wanted, info("Slow Dancing in the Dark", "Joji", Some(209.0))).accepted);
         assert!(!score_match(wanted, info("Slow Dancing in the Dark (slowed + reverb)", "Joji", Some(209.0))).accepted);
+    }
+
+    #[test]
+    fn une_recherche_sans_artiste_trouve_le_morceau() {
+        // « Blinding Lights » tapé seul : l'artiste vide était toujours refusé (score 0).
+        let wanted = info("Blinding Lights", "", None);
+        let official = score_match(wanted, info("The Weeknd - Blinding Lights (Official Audio)", "The Weeknd", Some(204.0)));
+        assert!(official.accepted, "{official:?}");
+        assert_eq!(official.title_similarity, 1.0);
+        assert!(score_match(wanted, info("Blinding Lights", "The Weeknd - Topic", Some(200.0))).accepted);
+        // Sans artiste, le titre et la version comptent toujours.
+        assert!(!score_match(wanted, info("Save Your Tears", "The Weeknd", Some(215.0))).accepted);
+        assert!(!score_match(wanted, info("Blinding Lights (sped up)", "The Weeknd", Some(160.0))).accepted);
     }
 
     #[test]
