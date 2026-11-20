@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { api } from "@/lib/api";
-import type { FetchWanted } from "@/lib/types";
+import { formatDuration } from "@/lib/format";
+import type { FetchWanted, SearchResult } from "@/lib/types";
 import { useFetchStore } from "@/stores/fetch";
 import { usePlaylistsStore } from "@/stores/playlists";
 import { useUiStore } from "@/stores/ui";
@@ -22,6 +23,14 @@ const busy = ref(false);
 const error = ref<string | null>(null);
 /** Playlist coupée par Spotify (100 premiers morceaux). */
 const notice = ref<string | null>(null);
+
+// Recherche à la façon d'Audiomack : une liste de résultats, chacun téléchargeable d'un geste.
+const results = ref<SearchResult[] | null>(null);
+/** Texte des résultats affichés (la liste reste tant qu'on ne relance pas). */
+const searchedFor = ref("");
+const searching = ref(false);
+/** Liens déjà envoyés à la file depuis cette liste (bouton remplacé par « Ajouté »). */
+const sent = ref(new Set<string>());
 
 onMounted(() => {
   void fetchStore.initialize();
@@ -55,7 +64,9 @@ const hint = computed(() => {
     case "link":
       return fetchStore.availability.ytdlp ? "Lien direct : le son est téléchargé tel quel (une playlist donne un morceau par tâche)." : "Les liens directs demandent yt-dlp.";
     case "search":
-      return "Recherche : le meilleur résultat qui correspond au titre (et à l'artiste) est gardé.";
+      return fetchStore.availability.ytdlp
+        ? "Recherche : choisis le bon résultat dans la liste, ou laisse l'appli prendre celui qui correspond le mieux."
+        : "Recherche : le meilleur résultat qui correspond au titre (et à l'artiste) est gardé.";
     default:
       return "";
   }
@@ -67,6 +78,46 @@ const canSubmit = computed(() => {
   if (kind.value === "link") return fetchStore.availability.ytdlp;
   return fetchStore.anyTool;
 });
+
+const canSearch = computed(() => !searching.value && kind.value === "search" && fetchStore.availability.ytdlp);
+
+async function runSearch() {
+  if (!canSearch.value) return;
+  const text = input.value.trim();
+  searching.value = true;
+  error.value = null;
+  notice.value = null;
+  try {
+    results.value = await api.fetchSearch(text);
+    searchedFor.value = text;
+    sent.value = new Set();
+  } catch (e) {
+    results.value = null;
+    error.value = String(e);
+  } finally {
+    searching.value = false;
+  }
+}
+
+/** Un résultat choisi : téléchargé tel quel par son lien (le titre de la vidéo est nettoyé à
+ *  l'import, comme pour un lien collé). */
+async function downloadResult(result: SearchResult) {
+  const ids = await fetchStore.enqueue([
+    { title: result.title, artist: result.artist, duration_secs: result.duration_secs, url: result.url, playlist_id: playlistId.value || null },
+  ]);
+  if (ids.length) {
+    sent.value = new Set([...sent.value, result.url]);
+    ui.notify("Ajouté à la file de téléchargements");
+  } else if (fetchStore.lastError) {
+    error.value = fetchStore.lastError;
+  }
+}
+
+/** Entrée dans le champ : une recherche montre ses résultats, un lien se télécharge. */
+function onEnter() {
+  if (kind.value === "search" && canSearch.value) void runSearch();
+  else void submit();
+}
 
 /** « Artiste - Titre » (tiret entouré d'espaces), sinon tout est le titre. */
 function parseSearch(text: string): { title: string; artist: string } {
@@ -118,7 +169,7 @@ async function submit() {
     <h1 class="page-title">Télécharger</h1>
     <p class="page-sub">Un lien ou une recherche : le morceau arrive dans la bibliothèque.</p>
 
-      <form class="card form" @submit.prevent="submit">
+      <form class="card form" @submit.prevent="onEnter">
         <label class="field">
           <span class="muted small">Lien YouTube, SoundCloud, Spotify… ou « Artiste - Titre »</span>
           <input v-model="input" class="fieldbox" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://… ou The Weeknd - Blinding Lights" aria-label="Lien ou recherche" />
@@ -131,7 +182,15 @@ async function submit() {
               <option v-for="p in playlists.items" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
           </label>
-          <button type="submit" class="pill pill-accent" :disabled="!canSubmit">
+          <template v-if="kind === 'search' && fetchStore.availability.ytdlp">
+            <button type="submit" class="pill pill-accent" :disabled="!canSearch">
+              <Icon name="search" :size="15" /> {{ searching ? "Recherche…" : "Rechercher" }}
+            </button>
+            <button type="button" class="pill pill-ghost" :disabled="!canSubmit" @click="submit">
+              <Icon name="import" :size="15" /> {{ busy ? "Lecture…" : "Meilleur résultat" }}
+            </button>
+          </template>
+          <button v-else type="submit" class="pill pill-accent" :disabled="!canSubmit">
             <Icon name="import" :size="15" /> {{ busy ? "Lecture…" : "Télécharger" }}
           </button>
         </div>
@@ -139,6 +198,28 @@ async function submit() {
         <p v-if="error" class="error" role="alert">{{ error }}</p>
         <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       </form>
+
+      <section v-if="results" class="card" aria-live="polite">
+        <div class="queue-head">
+          <h2>Résultats pour « {{ searchedFor }} »</h2>
+          <button type="button" class="pill pill-ghost" @click="results = null">Fermer</button>
+        </div>
+        <p v-if="!results.length" class="muted small">Aucun résultat : essaie avec l'artiste et le titre.</p>
+        <ul v-else class="results">
+          <li v-for="r in results" :key="r.url" class="result">
+            <img v-if="r.thumbnail" class="thumb" :src="r.thumbnail" alt="" loading="lazy" referrerpolicy="no-referrer" />
+            <span v-else class="thumb thumb-empty" aria-hidden="true"><Icon name="play" :size="16" /></span>
+            <div class="result-text">
+              <strong class="result-title">{{ r.title }}</strong>
+              <span class="muted small">{{ r.artist || "Artiste inconnu" }}<template v-if="r.duration_secs"> · {{ formatDuration(r.duration_secs) }}</template></span>
+            </div>
+            <span v-if="sent.has(r.url)" class="added small"><Icon name="check" :size="14" /> Ajouté</span>
+            <button v-else type="button" class="pill pill-accent" :aria-label="`Télécharger ${r.title}`" @click="downloadResult(r)">
+              <Icon name="import" :size="15" /><span class="result-action">Télécharger</span>
+            </button>
+          </li>
+        </ul>
+      </section>
 
       <section v-if="isAndroid" class="card tools">
         <p class="small muted">yt-dlp est intégré à l'appli : il se télécharge à la première utilisation (3 Mo) et se met à jour tout seul. Les morceaux arrivent en .m4a, lus directement par l'appli.</p>
@@ -235,5 +316,56 @@ async function submit() {
 }
 code {
   font-size: 12px;
+}
+.results {
+  display: grid;
+  gap: 6px;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.result {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  background: rgba(var(--fg-rgb), 0.04);
+}
+.thumb {
+  flex: none;
+  width: 64px;
+  height: 36px;
+  border-radius: calc(var(--radius) / 2);
+  object-fit: cover;
+  background: rgba(var(--fg-rgb), 0.08);
+}
+.thumb-empty {
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+}
+.result-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.result-title {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.added {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--success);
+}
+/* Téléphone : bouton réduit à son icône pour laisser la place au titre. */
+@media (max-width: 480px) {
+  .result-action {
+    display: none;
+  }
 }
 </style>
