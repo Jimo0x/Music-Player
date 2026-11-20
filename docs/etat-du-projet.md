@@ -1,58 +1,45 @@
 # État du projet
 
-Mis à jour le **20 novembre 2026** : **0.10.1** publiée, un travail en cours sur une branche
-locale (voir ci-dessous). À tenir à jour à chaque version : ce qui vient de sortir, ce qui
-reste, ce qui n'a pas été vérifié.
+Mis à jour le **20 novembre 2026** (soir) : **0.10.4** publiée, rien en cours. À tenir à jour à
+chaque version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
 
 ## En cours : à reprendre en premier
 
-### Retour à l'ancienne mise à jour Android (décision du propriétaire, 20/11)
+Rien en cours. Prochain chantier proposé : le lot **0.11.0 « Envoyer »** (voir « À faire
+ensuite »).
 
-Pourquoi : la mise à jour par le navigateur bloque parfois et peut abîmer le fichier. Le 19/11,
-la 0.10.0 refusait de s'installer sur le Pixel 6 Pro : le journal d'Android disait « SHA-256
-digest of contents did not verify » ; l'APK téléchargé par le navigateur avait la bonne taille
-mais un contenu différent de l'APK publié (empreintes `2addc7b3…` contre `1b6f1cf0…`). L'APK
-publié était sain (installé ensuite par câble, `adb install -r`, données gardées).
+### Fait le 20/11 : retour de la mise à jour Android par l'appli (0.10.2)
 
-Fait (branche **locale** `wip/mise-a-jour-dans-l-appli`, commit `d5b810c`, **non poussée**) :
-annulation exacte du retrait `cf04e2a` (`git apply -R`) sur `scripts/android-patch.mjs`,
-`src/stores/updater.ts` et `src/lib/androidMedia.ts`. Le bloc `UpdateBridge.kt` n'avait pas
-bougé depuis le retrait (vérifié). Revient : permission `REQUEST_INSTALL_PACKAGES`,
-`UpdateFileProvider` + `res/xml/update_paths.xml`, `UpdateNowReceiver`,
-`UpdateDownloadedReceiver`, téléchargement par le service d'Android avec nouveaux essais,
-notification « Prête à installer », `AndroidUpdate.download(url, version)` et `__mpUpdate`.
-Le bouton « Télécharger avec le navigateur » reste en secours. Lint, types et tests verts.
-
-Reste à faire, dans l'ordre :
-1. **Vérifier l'empreinte SHA-256 de l'APK avant l'installation.** L'API des versions de
-   GitHub donne `"digest": "sha256:…"` pour chaque fichier (vérifié sur la 0.10.1). Ajouter un
-   champ `sha256` à `UpdateInfo` (`src-tauri/src/updater.rs`, `newest_apk_for` lit
-   `asset["digest"]`), le passer à `AndroidUpdate.download(url, version, sha256)`, et dans
-   `UpdateBridge.watch` (après `STATUS_SUCCESSFUL`) comme dans `UpdateDownloadedReceiver`,
-   comparer avant `launchInstaller` / `notifyReady` ; si l'empreinte diffère : supprimer le
-   fichier, un nouvel essai, puis un message clair. Test Rust sur la lecture du champ.
-2. **Essai réel sur l'émulateur** : compiler en local avec une version plus basse que la
-   dernière publiée, signée avec la **clé de version** (`%USERPROFILE%\.music-player-android\`
-   : `release.p12` et ses secrets en fichiers texte, voir le LISEZ-MOI du dossier), l'installer,
-   laisser l'appli proposer la version GitHub, la télécharger et l'installer d'elle-même.
-3. Nouveautés (`src/nouveautes.json`) puis publication (correctif 0.10.2).
-4. Risque connu et accepté : Play Protect réagissait à cette méthode (0.5.16 à 0.7.0). Si
-   l'alerte revient : voir « Play Protect » plus bas.
+Décision du propriétaire : la mise à jour par le navigateur bloquait et pouvait abîmer le
+fichier (0.10.0 refusée sur le Pixel 6 Pro : « SHA-256 digest of contents did not verify »).
+L'appli télécharge de nouveau l'APK par le service de téléchargement d'Android, puis ouvre
+l'installation ; le navigateur reste en secours. Ajouté : l'APK reçu est comparé à l'empreinte
+SHA-256 publiée par GitHub (champ `digest` de la version) avant l'installation ; s'il diffère,
+il est effacé, retéléchargé une fois, puis un message clair s'affiche. Seules les adresses de
+version du projet sont acceptées. **Essai réel réussi** sur l'émulateur Android 14 : une 0.10.0
+signée avec la clé de version a proposé la 0.10.1, l'a téléchargée, vérifiée puis installée.
+Pas essayé en réel : le cas d'un fichier abîmé (écrit et testé en logique seulement).
+Risque Play Protect connu et accepté (voir plus bas).
 
 ## Versions récentes
 
 | Version | Date | Contenu principal |
 | --- | --- | --- |
-| 0.10.1 | 20/11/2026 | Trois corrections du contributeur : liens de playlist ou d'album = un morceau par tâche, un son partagé depuis un Mix YouTube reste un seul son (`--no-playlist`, `noplaylist`) ; recherche avec le titre seul ; liens Spotify courts (explication) et anciens `play.spotify.com` ; synchronisation des appareils liés qui dit pourquoi elle attend et reprend au retour dans l'appli |
-| 0.10.0 | 19/11/2026 | Téléchargement sur téléphone (yt-dlp intégré : Python 3.11 par Chaquopy 17.2.0) ; liens Spotify lus sans spotDL (page « embed », 100 morceaux au plus) ; recherche à la façon de spotDL (5 candidats, notre correspondance choisit) ; « Quoi de neuf ? » ; listes déroulantes lisibles. APK plus gros : arm64 58 Mo, armv7 43 Mo, complet 91 Mo |
-| 0.9.0 | 18/11/2026 | Sons Dolby (AC-3/E-AC-3 5.1) lus partout en Rust pur ; Opus en .m4a lu sans ffmpeg (Audiolab) ; écran verrouillé et touches multimédias sur Windows et Linux (MPRIS) ; page Télécharger ; boutons de l'import Spotify remis ; propositions en fin de file ; premier scan qui montre son avancement et ne bloque plus ; visualiseur allégé en mode léger ; tri dans Titres aimés ; Mo et temps restant pendant un envoi dans la discussion |
-| 0.8.0 | 18/11/2026 | Cartes de paroles « Arcane » (tarot) ; bouton retour Android = MENU en mode baladeur ; noms d'artistes tirés des titres de vidéos nettoyés ; avancement des téléchargements ; CSP activée ; partage Wi-Fi chiffré ; relais sans routes de compte ; actions CI v5 ; styles en variables du thème ; lot playlists ; guide du contributeur |
-| 0.7.1 | 12/11/2026 | Play Protect : l'appli n'installe plus d'APK (mise à jour par le navigateur) ; page de playlist virtualisée ; envoi par code par parties ; salle du relais gardée pendant un transfert |
-| 0.7.0 | 12/11/2026 | Mode baladeur (téléphone) : boîtier, molette tactile, 5 finitions, paroles sur petit écran |
-| 0.6.1 | 12/11/2026 | Moteur de téléchargement testé pour de vrai (outils hors PATH, pièges de spotDL) |
-| 0.6.0 | 12/11/2026 | Moteur de téléchargement (file spotDL puis yt-dlp), import Spotify par lien, données du compte ou fichier |
+| 0.10.4 | 20/11/2026 | Correspondance des téléchargements : l'artiste est aussi reconnu dans le titre de la vidéo (chaîne de paroles, chaîne absente des résultats, plusieurs artistes), mentions « (feat.) », « [From …] » ignorées ; essai réel sur les Top 50 France et Monde lus sur Spotify : 20 échecs sur 50 avant, 1 après, vidéos choisies vérifiées une à une. Liens courts du bouton « Partager » de Spotify (`spotify.link`, `spoti.fi`) suivis jusqu'au vrai lien |
+| 0.10.3 | 20/11/2026 | Contributeur : recherche avec liste de résultats dans Télécharger (15 résultats, miniature, chaîne, durée, « Meilleur résultat » garde l'ancien choix automatique) ; recherche tapée à l'envers (« Titre - Artiste ») |
+| 0.10.2 | 20/11/2026 | Mise à jour Android de nouveau faite par l'appli, avec vérification SHA-256 de l'APK |
+| 0.10.1 | 20/11/2026 | Trois corrections du contributeur : liens de playlist ou d'album = un morceau par tâche, un son partagé depuis un Mix YouTube reste un seul son ; recherche avec le titre seul ; liens Spotify courts (explication) et anciens `play.spotify.com` ; synchronisation des appareils liés qui dit pourquoi elle attend |
+| 0.10.0 | 19/11/2026 | Téléchargement sur téléphone (yt-dlp intégré : Python 3.11 par Chaquopy 17.2.0) ; liens Spotify lus sans spotDL (page « embed », 100 morceaux au plus) ; recherche à la façon de spotDL ; « Quoi de neuf ? » ; listes déroulantes lisibles |
+| 0.9.0 | 18/11/2026 | Sons Dolby (AC-3/E-AC-3 5.1) lus partout en Rust pur ; Opus en .m4a ; écran verrouillé et touches multimédias sur Windows et Linux (MPRIS) ; page Télécharger ; propositions en fin de file ; tri dans Titres aimés |
+| 0.8.0 | 18/11/2026 | Cartes de paroles « Arcane » ; bouton retour Android = MENU en mode baladeur ; CSP activée ; partage Wi-Fi chiffré ; lot playlists ; guide du contributeur |
+| 0.7.0 / 0.7.1 | 12/11/2026 | Mode baladeur ; envoi par code par parties ; page de playlist virtualisée |
 
-## Avis des utilisateurs (8 sur le relais au 20/11)
+Publication : la tâche macOS de la 0.10.4 a échoué une fois au moment de mettre à jour
+`latest.json` (« Not Found » de GitHub, sans doute plusieurs tâches qui modifient ce fichier en
+même temps) ; relancée seule, elle est passée (9 plateformes). Si ça revient : relancer la tâche
+en échec, ou faire mettre à jour `latest.json` par une seule tâche à la fin.
+
+## Avis des utilisateurs (5 sur le relais au 20/11)
 
 Lus avec le code administrateur (`%USERPROFILE%\.music-player-avis\code-admin.txt`) :
 `POST https://music-player-relais.loickamg.workers.dev/v1/avis/liste` avec `{"admin": code}` ;
@@ -61,55 +48,75 @@ Ne supprimer qu'avec l'accord du propriétaire.
 
 | Avis (début de l'id) | Sujet | État |
 | --- | --- | --- |
-| `f49992b3` (Méryl, 18/11) | « Tout est réglé » | Confirme `bf3c947a` et `5422dd57` : **ces 3 avis peuvent être supprimés** (accord du propriétaire demandé le 20/11, pas encore donné) |
-| `bf3c947a`, `5422dd57` (Méryl) | Pochettes des playlists, saisie de la discussion, champ d'avis | Réglés (confirmés par `f49992b3`) |
-| `0f6f48d3` (19/11, 0.9.0) | Envoyer plusieurs sons d'un coup ; dans la discussion, « + » doit permettre de choisir plusieurs sons et plusieurs playlists | **À faire** |
-| `8a2b18bc` | Tri dans Favoris et les playlists | Fait (0.8.0 playlists, 0.9.0 Favoris), confirmation du testeur attendue |
+| `0f6f48d3` (19/11, 0.9.0) | Envoyer plusieurs sons d'un coup ; dans la discussion, « + » doit permettre de choisir plusieurs sons et plusieurs playlists | **À faire** (lot 0.11.0) |
+| `8a2b18bc` | Tri dans Favoris et les playlists | Fait (0.8.0 playlists, 0.9.0 Favoris), confirmé par le propriétaire le 20/11 (« les filtres, c'est fait ») |
 | `a6243c4d` | %, Mo et temps restant pendant un envoi | Fait en 0.9.0, confirmation attendue |
 | `86f96b44`, `23757f22` | Enregistrements Audiolab .wav/.m4a illisibles | Fait en 0.9.0 (le trou était l'Opus dans un .m4a), confirmation attendue |
 
-## À faire ensuite (ordre proposé au propriétaire le 20/11, pas encore tranché)
+Les 3 avis de Méryl (« Tout est réglé », pochettes des playlists, saisie de la discussion)
+ont été supprimés le 20/11 avec l'accord du propriétaire.
 
-1. **Accès rapides sur téléphone** : Télécharger n'est accessible que par Réglages →
-   « Télécharger… » (sur PC : onglet de la barre latérale) ; le mode baladeur seulement par
-   Réglages → Personnalisation. Proposé : cartes d'accès rapide sur l'Accueil (Télécharger,
-   Mode baladeur, Importer de Spotify, Vocaux) et un bouton baladeur dans « À l'écoute ».
-2. **Notifications comme WhatsApp, appli fermée** (messages, sons, demandes des proches).
-   Aujourd'hui : tâche de fond `ProchesCheckJob` toutes les 15 min au mieux (Android la
-   repousse souvent de plusieurs heures) et option « Notifications instantanées » (service
-   `ProchesService`, vérification chaque minute, désactivée par défaut, souvent arrêtée par
-   les économiseurs de batterie). Proposé : notifications poussées par le relais via Firebase
-   Cloud Messaging (projet Firebase gratuit à créer par le propriétaire, clé de service en
-   secret du relais, `google-services.json` dans la construction), et la vérification actuelle
-   gardée en secours pour les téléphones sans services Google (Huawei de Méryl).
-3. **Envoi groupé** de sons et de playlists (avis `0f6f48d3`).
-4. **Lecteur plein écran sur l'écran verrouillé Android, façon Apple Music** (option B
-   choisie le 18/11) : activité affichée par-dessus l'écran verrouillé ; pour qu'elle s'ouvre
-   seule à l'allumage de l'écran, il faut l'autorisation « afficher par-dessus les autres
-   applis » (risque Play Protect à surveiller). Pas commencé.
-5. **Vérifications sur de vrais appareils** (liste plus bas).
-6. **Traduction** Français / English / langue du système, choisie par l'utilisateur (décision
-   du 19/11 : plus tard) : environ 1 200 textes (870 dans l'interface, 340 messages du moteur
-   Rust), 75 écrans.
-7. **Revue de sécurité, puis optimisation poussée**, une fois les fonctions confirmées.
+## À faire ensuite
+
+Retours du propriétaire (vocaux du 20/11) et demandes du même jour, regroupés en lots.
+
+**0.11.0 « Envoyer »** (prochain) :
+1. Envoyer **plusieurs sons d'un coup** (sélection, ou sons d'une playlist) avec « Envoyer à
+   quelqu'un » ; avis `0f6f48d3`.
+2. Envoyer **plusieurs playlists d'un coup**, dans la discussion ou ailleurs.
+3. **Plus de limite de 300 sons** pour une playlist jointe à un message : aujourd'hui, une
+   playlist jointe est décrite dans le message lui-même, plafonné par le relais (`MAX_BODY`,
+   96 Ko, « 300 morceaux décrits au plus »).
+4. **Partage par code fiable** : une playlist part en parties de 40 morceaux ou 150 Mo
+   (`sharing::PART_TRACKS`, `PART_BYTES`) ; si une partie échoue (coupure chez le
+   destinataire), la suite est abandonnée sans reprise. À faire : reprise après coupure,
+   avancement clair, explication du premier essai (103 morceaux envoyés, 97 ou 98 reçus :
+   probablement des doublons fusionnés à l'arrivée, à vérifier), et avis sur le découpage et
+   les limites du relais gratuit.
+
+**0.12.0 Personnalisation totale** : import de thèmes, d'icônes et de polices ; jaquettes de
+playlists ; couleurs, motifs, arrière-plans.
+
+**0.13.0 Ludique** : plusieurs barres de progression (vagues, style inspiré du lecteur de
+Huawei…) ; égaliseur et réglages de sortie audio plus amusants ; « Quoi de neuf ? »
+interactif ; accès rapides sur téléphone (Télécharger, mode baladeur hors des Réglages).
+
+**0.14.0 Mode immersif** : spatialisation du son (effet 8D, acoustique de salle), en Rust.
+
+**Ensuite** :
+- Notifications comme WhatsApp, appli fermée : notifications poussées par le relais via
+  Firebase Cloud Messaging (projet Firebase gratuit à créer par le propriétaire), la
+  vérification actuelle gardée en secours pour les téléphones sans services Google.
+- Lecteur plein écran sur l'écran verrouillé Android, façon Apple Music (option B, 18/11).
+- Vérifications sur de vrais appareils (liste plus bas).
+- Traduction Français / English / langue du système (décision du 19/11 : plus tard ;
+  environ 1 200 textes).
+- Revue de sécurité, puis optimisation poussée.
+
+**Petites choses** : sur téléphone, les titres de la liste de résultats sont coupés court (deux
+lignes aideraient) ; dans `src/lib/api.ts`, le commentaire de `fetchReadLink` est au-dessus de
+`fetchSearch`.
 
 ### Points en attente d'une décision du propriétaire
 
-- Suppression des 3 avis de Méryl (voir le tableau des avis).
-- **Fichiers d'outillage publiés dans le dépôt**, contraire à sa règle globale (fichiers
-  d'outillage exclus par `.git/info/exclude`, aucun outil nommé dans un fichier versionné) :
-  le fichier de consignes à la racine (suivi depuis `6fa2185`, 18/11, bien que listé dans
-  `.git/info/exclude`), le lien du README vers lui (ligne « Pour reprendre le travail ») et le
-  document de prompt dans `docs/`. Proposé : retirer le fichier du suivi
-  (`git rm --cached`, il reste sur le disque), retirer le lien, retirer le document. Rien fait
-  sans son accord (suppression de fichiers du dépôt).
+- **Fichiers d'outillage publiés dans le dépôt**, contraire à sa règle globale : le fichier de
+  consignes à la racine (suivi depuis `6fa2185`, bien que listé dans `.git/info/exclude`), le
+  lien du README vers lui et le document de prompt dans `docs/`. Proposé : retirer le fichier
+  du suivi (`git rm --cached`, il reste sur le disque), retirer le lien et le document.
+- Supprimer `C:\Android\sdk` et `C:\Android\dl` (≈ 3,6 Go inutiles ; disque C: presque plein).
+- Supprimer la branche locale `sauvegarde-main-avant-nettoyage` (ancien `main`, voir
+  « Contributeur »).
+- Rendre la tâche CI « commits » obligatoire dans la protection de `main` (réglage GitHub,
+  à faire par le propriétaire).
 
 ## Vérifications sur de vrais appareils
 
 Rien de cette liste n'a été essayé sur un vrai téléphone ou une vraie machine, sauf mention.
 
-- **Pixel 6 Pro (Android 17)** : 0.10.0 installée par câble le 19/11 ; téléchargement sur
-  téléphone pas encore essayé par le propriétaire.
+- **Pixel 6 Pro (Android 17)** : 0.10.1 puis 0.10.3 installées par câble le 20/11
+  (`adb install -r`, données gardées). À essayer : la mise à jour 0.10.4 par l'appli,
+  la recherche avec liste de résultats, « Télécharger les manquants », un vrai lien
+  `spotify.link`.
 - **Moov Smart Pro** (0.5.15 installée le 18/11) : sons Dolby de The Weeknd (Trilogy,
   Starboy, After Hours, Kiss Land : 73 fichiers en E-AC-3 5.1) après mise à jour.
 - **Écran verrouillé du PC** dans la vraie appli (Windows) ; **Linux / CachyOS** (AppImage,
@@ -135,13 +142,21 @@ Rien de cette liste n'a été essayé sur un vrai téléphone ou une vraie machi
 
 ## Contributeur
 
-**Jimo0x** (fork `Jimo0x/Music-Player`, branches `correctif/…`). Demandes #1, #2 et #3
-relues, essayées, approuvées et fusionnées le 20/11 (merge commits `c127aa4`, `41e89cb`,
-`aaf7075`) ; #2 d'abord renvoyée pour correction (son d'un Mix YouTube → 500 téléchargements),
-corrigée en `09cfaaa` et `92d0536`. #4 et #5 : demandes de test de la CI, fermées par lui sans
-fusion. Le guide (`CONTRIBUTING.md`) explique où lire les relectures et comment régler ses
-notifications GitHub. Toute relecture commence par **@Jimo0x** (sinon il n'est pas toujours
-prévenu).
+**Jimo0x** (fork `Jimo0x/Music-Player`, branches `correctif/…` et `fonction/…`). Demandes #1,
+#2 et #3 fusionnées le 20/11 (merge commits) ; #6 (liste de résultats) et #7 (recherche
+inversée) relues, essayées (recherche réelle avec yt-dlp, écran en mode démo), approuvées et
+fusionnées **en un seul commit chacune, au message réécrit**. Toute relecture commence par
+**@Jimo0x** (sinon il n'est pas toujours prévenu).
+
+**Lignes d'attribution retirées (20/11)** : ses commits portaient `Co-Authored-By:` (un outil)
+et un lien de session ; GitHub listait l'outil parmi les contributeurs. Avec l'accord du
+propriétaire, `main` a été réécrit (messages seulement, contenu identique, auteurs et dates
+gardés) puis poussé en force ; les étiquettes `app-v0.10.1` et `app-v0.10.2` ont été déplacées
+sur les nouveaux commits (versions et fichiers intacts). L'ancien `main` reste dans la branche
+locale `sauvegarde-main-avant-nettoyage`. Jimo0x doit remettre son fork à jour sur le nouveau
+`main`. Depuis : règle d'or n° 7 de `CONTRIBUTING.md`, case du modèle de demande de fusion, et
+tâche CI « commits » qui refuse un commit portant `Co-Authored-By:`, « Generated with … » ou un
+lien de session. Fusionner ses demandes en un seul commit au message relu.
 
 ## Fait les 18-20/11 (détail utile)
 
@@ -167,25 +182,27 @@ prévenu).
 
 ## Repères techniques récents
 
-- Moteur de téléchargement : `src-tauri/src/fetch/` : file persistante (`queue.rs`,
-  `drain_queue` testée), adaptateurs spotDL et yt-dlp (`spotdl.rs`, `ytdlp.rs` : 5 candidats,
-  `pick_candidate`, `read_media_link` pour les liens de playlist), correspondance
-  (`matching.rs`), import (`import.rs` : extension réelle gardée, dossier de travail à part,
-  copie entre espaces de stockage), liens Spotify (`link.rs`, `spotify_embed.rs`).
+- Mise à jour Android : `src-tauri/src/updater.rs` (`sha256_of` lit le `digest` GitHub),
+  `scripts/android-patch.mjs` (`Updates.digestOf`, `sha256Of`, `verifyApk`, `UpdateBridge.watch`,
+  `UpdateDownloadedReceiver`), `src/stores/updater.ts`.
+- Correspondance : `src-tauri/src/fetch/matching.rs` (`artist_evidence` : chaîne d'abord, sinon
+  titre de la vidéo ; `core_title` retire « (feat.) », « [From …] », « (with …) »). Recherche avec
+  résultats : `fetch::commands::fetch_search`, `ytdlp::search_songs`, `DownloadView.vue`.
+- Liens Spotify : `fetch/link.rs` (`resolve_short_link` suit `spotify.link`/`spoti.fi` sur les
+  hôtes de Spotify seulement, `find_spotify_url`), `spotify_embed.rs`.
+- Moteur de téléchargement : `src-tauri/src/fetch/` : file persistante (`queue.rs`), adaptateurs
+  spotDL et yt-dlp (`spotdl.rs`, `ytdlp.rs` : 5 candidats, `pick_candidate`), import (`import.rs`).
 - Téléphone : `fetch/android.rs` (pont JNI vers `YtDlpBridge.kt`), `fetch/ytdlp_zip.rs`
-  (yt-dlp téléchargé, SHA-256 vérifié, contrôle quotidien),
-  `src-tauri/android/python/mp_ytdlp.py` (copié par `android-patch.mjs`, règle R8
-  `proguard-ytdlp.pro`), morceaux rangés par `sharing::downloads_dir`.
-- Sons : `dolby.rs`, `opus.rs` (Ogg et MP4), `audio.rs::open_decoder`.
-- Écran verrouillé et touches multimédias (PC) : `media_controls.rs` (souvlaki : Windows SMTC,
-  Linux MPRIS par zbus), pont dans `src/lib/androidMedia.ts`.
-- « Quoi de neuf ? » : `src/nouveautes.json`, `src/lib/whatsNew.ts`,
-  `src/components/WhatsNew.vue`, `scripts/release-notes.mjs` (texte des versions GitHub).
-- Interface : `DownloadView.vue`, `FetchJobs.vue`, `EndOfQueue.vue` + `src/lib/suggestions.ts`,
-  `src/lib/pace.ts` (débit et temps restant).
-- Partage : `remote.rs` (par code, SPAKE2 + ChaCha20-Poly1305, parties), `nearby.rs` +
-  `sealed.rs` (Wi-Fi, chiffré), `sharing.rs` (archives `.mpshare`).
+  (yt-dlp téléchargé, SHA-256 vérifié), `src-tauri/android/python/mp_ytdlp.py`.
+- Sons : `dolby.rs`, `opus.rs`, `audio.rs::open_decoder`.
+- Écran verrouillé et touches multimédias (PC) : `media_controls.rs` ; pont `src/lib/androidMedia.ts`.
+- « Quoi de neuf ? » : `src/nouveautes.json` (obligatoire à chaque version, sinon le test
+  `whatsNew.test.ts` et la CI échouent), `src/lib/whatsNew.ts`, `src/components/WhatsNew.vue`.
+- Partage : `remote.rs` (par code, SPAKE2 + ChaCha20-Poly1305, parties), `nearby.rs` + `sealed.rs`
+  (Wi-Fi, chiffré), `sharing.rs` (archives `.mpshare`, `playlist_parts`).
 - Relais Cloudflare : `relay/src/index.js` (Durable Objects Salle, Profil, Zone, Avis, Colis).
 - Mode baladeur : `src/components/Baladeur.vue`, `src/lib/baladeur.ts`, `src/stores/baladeur.ts`.
-- Sélection multiple et playlists : `SelectionBar.vue`, `AddToPlaylists.vue`,
-  `src/lib/selection.ts`, `src/lib/trackSort.ts`.
+- Environnement Android local : Android Studio, SDK et NDK dans `%LOCALAPPDATA%\Android\Sdk`,
+  Java 17 `C:\Android\jdk-17`, émulateurs `MusicPlayer_API34` et `Medium_Phone_API_37.0` ;
+  `bash scripts/android-local.sh x86_64`. APK de version signé avec
+  `%USERPROFILE%\.music-player-android\release.p12` (`apksigner --ks-type PKCS12`).
