@@ -60,7 +60,7 @@ ont été supprimés le 20/11 avec l'accord du propriétaire.
 
 Retours du propriétaire (vocaux du 20/11) et demandes du même jour, regroupés en lots.
 
-**0.11.0 « Envoyer »** (prochain) :
+**0.11.0 « Envoyer »** (prochain, **confié à Jimo0x le 20/11** : tickets #8 à #11 ; petites choses : #12) :
 1. Envoyer **plusieurs sons d'un coup** (sélection, ou sons d'une playlist) avec « Envoyer à
    quelqu'un » ; avis `0f6f48d3`.
 2. Envoyer **plusieurs playlists d'un coup**, dans la discussion ou ailleurs.
