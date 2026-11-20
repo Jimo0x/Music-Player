@@ -37,8 +37,7 @@ onMounted(() => {
   void fetchStore.refreshAvailability();
 });
 
-/** Lien court du bouton « Partager » de Spotify : il ne mène au morceau qu'après un passage
- *  par le navigateur, que l'appli ne fait pas. */
+/** Lien court du bouton « Partager » de Spotify : l'appli le suit jusqu'au vrai lien. */
 const SHORT_SPOTIFY = /^https?:\/\/(spotify\.link|spoti\.fi)\//i;
 
 /** Ancienne adresse `play.spotify.com` : même lien sous `open.spotify.com` (seule acceptée). */
@@ -60,7 +59,7 @@ const hint = computed(() => {
     case "spotify":
       return fetchStore.anyTool ? "Lien Spotify : chaque morceau sera cherché puis téléchargé." : "Les liens Spotify demandent yt-dlp ou spotDL.";
     case "short":
-      return "Lien court de Spotify : ouvre-le dans le navigateur, puis colle ici l'adresse open.spotify.com qui s'affiche.";
+      return fetchStore.anyTool ? "Lien Spotify (lien court du bouton Partager) : chaque morceau sera cherché puis téléchargé." : "Les liens Spotify demandent yt-dlp ou spotDL.";
     case "link":
       return fetchStore.availability.ytdlp ? "Lien direct : le son est téléchargé tel quel (une playlist donne un morceau par tâche)." : "Les liens directs demandent yt-dlp.";
     case "search":
@@ -73,8 +72,8 @@ const hint = computed(() => {
 });
 
 const canSubmit = computed(() => {
-  if (busy.value || !kind.value || kind.value === "short") return false;
-  if (kind.value === "spotify") return fetchStore.anyTool;
+  if (busy.value || !kind.value) return false;
+  if (kind.value === "spotify" || kind.value === "short") return fetchStore.anyTool;
   if (kind.value === "link") return fetchStore.availability.ytdlp;
   return fetchStore.anyTool;
 });
@@ -135,7 +134,7 @@ async function submit() {
   notice.value = null;
   try {
     let wanted: FetchWanted[];
-    if (kind.value === "spotify") {
+    if (kind.value === "spotify" || kind.value === "short") {
       const list = await api.fetchReadLink(spotifyLink(text));
       if (list.partial) notice.value = "Spotify n'a donné que les 100 premiers morceaux de cette playlist. Pour la liste complète : importe tes données Spotify (page « Importer de Spotify »), ou installe spotDL sur ordinateur.";
       wanted = list.tracks.map((t) => ({ title: t.title, artist: t.artist, album: t.album, duration_secs: t.duration_secs, playlist_id: target }));

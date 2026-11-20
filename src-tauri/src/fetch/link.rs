@@ -78,6 +78,8 @@ struct SpotdlTrack {
 
 #[tauri::command(async)]
 pub fn fetch_read_link(app: tauri::AppHandle, url: String) -> Result<LinkPlaylist, String> {
+    // Lien court du bouton « Partager » de l'appli Spotify : suivi jusqu'au vrai lien.
+    let url = if is_short_link(&url) { resolve_short_link(&url)? } else { url };
     let link = validate_spotify_link(&url)?;
     let embed = super::spotify_embed::read(link.kind.segment(), link.id());
     // Playlist peut-être coupée à 100 : spotDL (ordinateur) lit la liste complète, s'il est là.
@@ -175,6 +177,72 @@ fn validate_spotify_link(input: &str) -> Result<ValidatedLink, String> {
         return Err("Ce lien Spotify n'a pas un identifiant valide (22 lettres ou chiffres).".to_owned());
     }
     Ok(ValidatedLink { kind, url: format!("https://open.spotify.com/{}/{id}", kind.segment()) })
+}
+
+/// Hôtes des liens courts de Spotify (bouton « Partager » de l'appli, anciens liens).
+const SHORT_HOSTS: [&str; 3] = ["spotify.link", "spoti.fi", "spotify.app.link"];
+const SHORT_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
+const SHORT_MAX_HOPS: usize = 5;
+const SHORT_MAX_PAGE_BYTES: u64 = 2 * 1024 * 1024;
+
+/// Hôte d'une adresse https (sans port ni chemin), en minuscules.
+fn https_host(url: &str) -> Option<String> {
+    let rest = url.trim().strip_prefix("https://").or_else(|| url.trim().strip_prefix("http://"))?;
+    let host = rest.split(['/', '?', '#']).next()?;
+    (!host.is_empty() && !host.contains(['@', ':'])).then(|| host.to_ascii_lowercase())
+}
+
+/// `https://spotify.link/…` ou `https://spoti.fi/…`.
+fn is_short_link(url: &str) -> bool {
+    https_host(url).is_some_and(|host| SHORT_HOSTS.contains(&host.as_str()))
+}
+
+/// Premier lien open.spotify.com valide (playlist, album, morceau) dans une page ou une
+/// redirection ; les `\/` du JSON sont d'abord remis en `/`.
+fn find_spotify_url(text: &str) -> Option<String> {
+    let text = text.replace("\\/", "/");
+    text.match_indices("https://open.spotify.com/").find_map(|(at, _)| {
+        let candidate: String = text[at..].chars().take_while(|c| !c.is_whitespace() && !matches!(c, '"' | '\'' | '<' | '>' | '\\')).collect();
+        validate_spotify_link(&candidate).ok().map(|link| link.url)
+    })
+}
+
+/// Suit un lien court (redirections une à une, hôtes de Spotify seulement) jusqu'au lien
+/// open.spotify.com, sans jamais ouvrir d'autre site.
+fn resolve_short_link(input: &str) -> Result<String, String> {
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(15)))
+        .max_redirects(0)
+        .http_status_as_error(false)
+        .build()
+        .into();
+    let unreadable = "Ce lien court de Spotify ne mène à aucun morceau, album ou playlist. Ouvre-le dans le navigateur, puis colle ici l'adresse open.spotify.com qui s'affiche.";
+    let mut url = input.trim().to_owned();
+    for _ in 0..SHORT_MAX_HOPS {
+        if !is_short_link(&url) {
+            return Err(unreadable.to_owned());
+        }
+        let mut response = agent
+            .get(&url)
+            .header("User-Agent", SHORT_USER_AGENT)
+            .call()
+            .map_err(|error| format!("Spotify ne répond pas : {error}"))?;
+        let status = response.status().as_u16();
+        if (300..400).contains(&status) {
+            let location = response.headers().get("location").and_then(|v| v.to_str().ok()).unwrap_or_default().to_owned();
+            if let Some(found) = find_spotify_url(&location) {
+                return Ok(found);
+            }
+            url = location;
+            continue;
+        }
+        if status != 200 {
+            return Err(format!("Spotify a répondu {status} pour ce lien court."));
+        }
+        let page = response.body_mut().with_config().limit(SHORT_MAX_PAGE_BYTES).read_to_string().unwrap_or_default();
+        return find_spotify_url(&page).ok_or_else(|| unreadable.to_owned());
+    }
+    Err(unreadable.to_owned())
 }
 
 /// `intl-fr`, `intl-pt`, `intl-pt-br`…
@@ -291,7 +359,27 @@ fn read_spotdl_file(path: &Path, kind: Kind) -> Result<LinkPlaylist, JobError> {
 mod tests {
     use std::fs;
 
-    use super::{read_spotdl_file, validate_spotify_link, Kind, LinkTrack};
+    use super::{find_spotify_url, is_short_link, read_spotdl_file, resolve_short_link, validate_spotify_link, Kind, LinkTrack};
+
+    #[test]
+    fn short_links_are_recognised_and_followed_only_on_spotify_hosts() {
+        assert!(is_short_link("https://spotify.link/AbCdEf123"));
+        assert!(is_short_link("https://spoti.fi/3xYz"));
+        assert!(!is_short_link("https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8"));
+        assert!(!is_short_link("https://spotify.link.evil.com/x"));
+        assert!(!is_short_link("https://user@spotify.link/x"));
+        assert!(resolve_short_link("https://example.com/x").is_err());
+    }
+
+    #[test]
+    fn finds_the_spotify_link_in_a_redirect_or_a_page() {
+        let id = "4PTG3Z6ehGkBFwjybzWkR8";
+        let expected = Some(format!("https://open.spotify.com/track/{id}"));
+        assert_eq!(find_spotify_url(&format!("https://open.spotify.com/track/{id}?si=abc&utm_source=copy-link")), expected);
+        assert_eq!(find_spotify_url(&format!(r#"<a href="https://open.spotify.com/intl-fr/track/{id}?si=x">"#)), expected);
+        assert_eq!(find_spotify_url(&format!(r#"{{"url":"https:\/\/open.spotify.com\/track\/{id}"}}"#)), expected);
+        assert_eq!(find_spotify_url("https://open.spotify.com/ puis https://open.spotify.com/artist/x"), None);
+    }
 
     const ID: &str = "0123456789ABCDEFGHIJKL";
 
