@@ -16,6 +16,7 @@ interface AndroidMediaBridge {
 }
 
 interface AndroidUpdateBridge {
+  download(url: string, version: string): void;
   openInBrowser(url: string): void;
   backgroundAllowed?(): boolean;
   openBatterySettings?(): void;
@@ -61,6 +62,7 @@ declare global {
     AndroidMedia?: AndroidMediaBridge;
     AndroidUpdate?: AndroidUpdateBridge;
     __mpMedia?: (command: string, arg: number) => void;
+    __mpUpdate?: (stage: string, value: number | string) => void;
     __mpInsets?: (insets: Partial<Record<"top" | "bottom" | "left" | "right" | "ime", number>>) => void;
     __mpOpenFile?: () => void;
     __mpLibraryChanged?: () => void;
