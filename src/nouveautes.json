@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.10.3",
+    "date": "2026-11-20",
+    "items": [
+      "Télécharger : une recherche montre maintenant une liste de résultats (miniature, titre, chaîne, durée). Choisissez le bon et téléchargez-le d'un geste ; « Meilleur résultat » laisse l'appli choisir comme avant.",
+      "Télécharger : une recherche tapée à l'envers (« Blinding Lights - The Weeknd ») trouve quand même le morceau."
+    ]
+  },
+  {
     "version": "0.10.2",
     "date": "2026-11-20",
     "items": [
