@@ -1,7 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Music Player",
+ main
   "version": "0.10.1",
+
+  "version": "0.10.4",
+ main
   "identifier": "dev.mahouna.musicplayer",
   "build": {
     "beforeDevCommand": "npm run dev",

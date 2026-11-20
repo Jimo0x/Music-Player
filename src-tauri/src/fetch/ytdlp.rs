@@ -160,6 +160,56 @@ fn no_match(candidates: &[Candidate], raw: &str) -> JobError {
     JobError::Failed(format!("Aucun des {} résultats ne correspond assez : {}.", candidates.len(), seen.join(" ; ")))
 }
 
+/// Résultats montrés par la recherche de la page Télécharger (à la façon d'Audiomack).
+pub const SEARCH_RESULTS: usize = 15;
+
+/// Un résultat de recherche, à télécharger par son lien si la personne le choisit.
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+pub struct SearchResult {
+    pub title: String,
+    pub artist: String,
+    pub duration_secs: Option<f64>,
+    pub url: String,
+    /// Miniature publique de YouTube (i.ytimg.com), reconstruite depuis l'identifiant.
+    pub thumbnail: Option<String>,
+}
+
+/// Recherche tapée dans l'appli : les résultats, sans rien télécharger. Mêmes chemins que la
+/// recherche du moteur (yt-dlp « à plat » sur ordinateur, yt-dlp intégré sur téléphone).
+pub fn search_songs(text: &str) -> Result<Vec<SearchResult>, JobError> {
+    let query = search_query(text)?;
+    let candidates = if cfg!(target_os = "android") {
+        let zip = super::ytdlp_zip::ensure(super::android::data_dir()?)?;
+        parse_candidates(&super::android::search(&zip, &query)?)
+    } else {
+        let cancel = AtomicBool::new(false);
+        let runner = resolve_runner(&cancel)?;
+        search_candidates(&runner, &query, &cancel)?
+    };
+    Ok(candidates
+        .into_iter()
+        .map(|c| SearchResult { thumbnail: video_id(&c.url).map(|id| format!("https://i.ytimg.com/vi/{id}/mqdefault.jpg")), title: c.title, artist: c.artist, duration_secs: c.duration_secs, url: c.url })
+        .collect())
+}
+
+/// `ytsearch15:<texte>` : espaces regroupés, 200 caractères au plus, jamais de « - » en tête
+/// (sur ordinateur la recherche suit déjà « -- », sur téléphone elle va à Python telle quelle).
+fn search_query(text: &str) -> Result<String, JobError> {
+    let joined = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let cleaned: String = joined.trim_start_matches(|c: char| c == '-' || c.is_whitespace()).chars().take(200).collect();
+    if cleaned.trim().is_empty() {
+        return Err(JobError::Failed("Tapez un titre, un artiste ou les deux.".to_owned()));
+    }
+    Ok(format!("ytsearch{SEARCH_RESULTS}:{}", cleaned.trim()))
+}
+
+/// Identifiant d'une vidéo YouTube (11 caractères) dans un lien `watch?v=` ou `/shorts/`.
+fn video_id(url: &str) -> Option<&str> {
+    let rest = url.split_once("v=").or_else(|| url.split_once("/shorts/"))?.1;
+    let id = rest.split(['&', '?', '#', '/']).next()?;
+    (id.len() == 11 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')).then_some(id)
+}
+
 /// Résultat de recherche YouTube, avant tout téléchargement.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct Candidate {
@@ -518,5 +568,23 @@ mod tests {
         assert!(matches!(classify_failure("", "ERROR: [youtube:search] No video results"), JobError::NotFound));
         assert!(matches!(classify_failure("", "ERROR: Unable to download webpage: HTTP Error 404"), JobError::NotFound));
         assert!(matches!(classify_failure("", "ERROR: HTTP Error 429: Too Many Requests"), JobError::Network(_)));
+    }
+
+    #[test]
+    fn la_recherche_de_l_appli_demande_quinze_resultats_sans_option_cachee() {
+        assert_eq!(super::search_query("  The   Weeknd  ").expect("recherche"), "ytsearch15:The Weeknd");
+        assert_eq!(super::search_query("--exec calc").expect("recherche"), "ytsearch15:exec calc");
+        assert!(super::search_query(" - ").is_err());
+        assert!(super::search_query("").is_err());
+        assert_eq!(super::search_query(&"a".repeat(500)).expect("recherche").len(), "ytsearch15:".len() + 200);
+    }
+
+    #[test]
+    fn retrouve_la_miniature_d_une_video() {
+        assert_eq!(super::video_id("https://www.youtube.com/watch?v=fHI8X4OXluQ"), Some("fHI8X4OXluQ"));
+        assert_eq!(super::video_id("https://music.youtube.com/watch?v=fHI8X4OXluQ&list=x"), Some("fHI8X4OXluQ"));
+        assert_eq!(super::video_id("https://www.youtube.com/shorts/fHI8X4OXluQ"), Some("fHI8X4OXluQ"));
+        assert_eq!(super::video_id("https://www.youtube.com/watch?v=../../x"), None);
+        assert_eq!(super::video_id("https://soundcloud.com/a/b"), None);
     }
 }

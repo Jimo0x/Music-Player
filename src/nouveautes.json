@@ -1,5 +1,33 @@
 [
   {
+ main
+
+    "version": "0.10.4",
+    "date": "2026-11-20",
+    "items": [
+      "Télécharger les manquants (import Spotify) : bien plus de morceaux sont trouvés. L'artiste est aussi reconnu dans le titre de la vidéo, les morceaux à plusieurs artistes passent, et les mentions comme « (feat. …) » ou « [From …] » ne gênent plus.",
+      "Un lien partagé depuis l'appli Spotify (spotify.link) se télécharge directement, sans passer par le navigateur."
+    ]
+  },
+  {
+    "version": "0.10.3",
+    "date": "2026-11-20",
+    "items": [
+      "Télécharger : une recherche montre maintenant une liste de résultats (miniature, titre, chaîne, durée). Choisissez le bon et téléchargez-le d'un geste ; « Meilleur résultat » laisse l'appli choisir comme avant.",
+      "Télécharger : une recherche tapée à l'envers (« Blinding Lights - The Weeknd ») trouve quand même le morceau."
+    ]
+  },
+  {
+    "version": "0.10.2",
+    "date": "2026-11-20",
+    "items": [
+      "Téléphone : la mise à jour se fait de nouveau dans l'appli. Android télécharge la nouvelle version (même sur une connexion lente, avec reprise), puis ouvre l'installation, sans passer par le navigateur.",
+      "Avant l'installation, l'appli vérifie que le fichier reçu est exactement celui publié. S'il a été abîmé pendant le téléchargement, il est effacé et retéléchargé.",
+      "Le bouton « Télécharger avec le navigateur » reste disponible en secours."
+    ]
+  },
+  {
+ main
     "version": "0.10.1",
     "date": "2026-11-20",
     "items": [

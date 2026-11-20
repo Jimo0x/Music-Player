@@ -19,4 +19,5 @@
 
 - [ ] Un seul sujet ; aucun code qui marchait n'a été réécrit
 - [ ] Aucune donnée personnelle ni aucun secret (code, tests, captures)
+- [ ] Aucun commit avec `Co-Authored-By:`, « Generated with … » ou un lien de session
 - [ ] Aucune zone protégée modifiée sans accord (`relay/`, `scripts/android-patch.mjs`, `tauri.conf.json`, `.github/workflows/`, formats de fichiers, dépendances)

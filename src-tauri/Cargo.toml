@@ -1,6 +1,10 @@
 [package]
 name = "music-player"
+main
 version = "0.10.1"
+
+version = "0.10.4"
+ main
 description = "Lecteur de musique local avec paroles synchronisées"
 authors = ["Mahouna"]
 edition = "2021"

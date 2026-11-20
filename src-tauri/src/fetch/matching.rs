@@ -52,8 +52,8 @@ const DURATION_MAX: f64 = 12.0;
 ///
 /// Une durée demandée doit être vérifiable sur le candidat.
 pub fn score_match(wanted: TrackInfo<'_>, candidate: TrackInfo<'_>) -> MatchScore {
-    let wanted_words = words(wanted.title);
-    let candidate_words = words(candidate.title);
+    let wanted_words = words(&core_title(wanted.title));
+    let candidate_words = words(&core_title(candidate.title));
     let wanted_artist = tokens(&words(wanted.artist));
     let wanted_title = tokens(&wanted_words);
     let candidate_artist = tokens(&words(candidate.artist));
@@ -66,11 +66,21 @@ pub fn score_match(wanted: TrackInfo<'_>, candidate: TrackInfo<'_>) -> MatchScor
     // (« Damso - Bruxelles vie ») et une année ajoutée (« Remastered 2011 »).
     let candidate_title: HashSet<String> = tokens(&candidate_words)
         .into_iter()
+
+  main
         .filter(|w| wanted_title.contains(w) || !(artist_words.contains(w) || is_year(w)))
         .collect();
 
     let title_similarity = token_similarity(&wanted_title, &candidate_title);
     let artist_similarity = token_similarity(&wanted_artist, &candidate_artist);
+
+        .filter(|w| wanted_title.contains(w) || !(artist_words.contains(w) || is_year(w) || is_artist_link(w)))
+        .collect();
+
+    let title_similarity = token_similarity(&wanted_title, &candidate_title);
+    let artist_similarity = artist_evidence(wanted.artist, &candidate_artist, &tokens(&words(candidate.title)));
+
+  main
 
     let wanted_duration = valid_duration(wanted.duration_secs);
     let duration_delta_secs = wanted_duration
@@ -110,6 +120,41 @@ pub fn score_match(wanted: TrackInfo<'_>, candidate: TrackInfo<'_>) -> MatchScor
     MatchScore { total, title_similarity, artist_similarity, duration_delta_secs, version_mismatch, accepted }
 }
 
+/// Part de l'artiste demandé (chacun de ceux que Spotify liste, « Tiakola, Jorja Smith »)
+/// retrouvée chez le candidat : le nom de sa chaîne d'abord (preuve la plus forte), sinon le
+/// titre de sa vidéo (« Wham! - Last Christmas (Lyrics) » mis en ligne par une chaîne de paroles,
+/// ou chaîne absente des résultats de yt-dlp), un peu moins sûr.
+fn artist_evidence(wanted_artist: &str, channel: &HashSet<String>, candidate_title: &HashSet<String>) -> f64 {
+    let listed: Vec<HashSet<String>> = wanted_artist
+        .split([',', '&', ';'])
+        .map(|name| tokens(&words(name)))
+        .filter(|name| !name.is_empty())
+        .collect();
+    let whole = tokens(&words(wanted_artist));
+    let coverage = |name: &HashSet<String>, seen: &HashSet<String>| name.intersection(seen).count() as f64 / name.len() as f64;
+    let by_channel = listed.iter().chain(std::iter::once(&whole)).map(|name| token_similarity(name, channel)).fold(0.0, f64::max);
+    let by_title = listed.iter().map(|name| coverage(name, candidate_title)).fold(0.0, f64::max);
+    by_channel.max(by_title * 0.9)
+}
+
+/// Titre sans les mentions ajoutées par Spotify entre parenthèses ou crochets : « (feat. …) »,
+/// « [From GTAVI: Original Score] », « (with …) ».
+fn core_title(title: &str) -> String {
+    let mut out = String::with_capacity(title.len());
+    let mut rest = title;
+    while let Some(open) = rest.find(['(', '[']) {
+        let close_char = if rest[open..].starts_with('(') { ')' } else { ']' };
+        let Some(close) = rest[open..].find(close_char).map(|i| open + i) else { break };
+        let inner = rest[open + 1..close].trim_start().to_lowercase();
+        let added = ["feat", "ft.", "with ", "from "].iter().any(|start| inner.starts_with(start));
+        out.push_str(&rest[..if added { open } else { close + 1 }]);
+        rest = &rest[close + 1..];
+    }
+    out.push_str(rest);
+    let cleaned = out.split_whitespace().collect::<Vec<_>>().join(" ");
+    if cleaned.is_empty() { title.to_owned() } else { cleaned }
+}
+
 fn valid_duration(duration: Option<f64>) -> Option<f64> {
     duration.filter(|value| value.is_finite() && *value > 0.0)
 }
@@ -144,6 +189,11 @@ fn tokens(words: &[String]) -> HashSet<String> {
             _ => w.clone(),
         })
         .collect()
+}
+
+/// Mot qui relie deux artistes dans un titre de vidéo (« Tiakola x Jorja Smith »).
+fn is_artist_link(word: &str) -> bool {
+    matches!(word, "x" | "and" | "et" | "vs")
 }
 
 fn is_year(word: &str) -> bool {
@@ -190,6 +240,37 @@ mod tests {
         let score = score_match(info("Beyoncé", "Beyoncé", Some(200.0)), info("Beyonce", "Beyonce", Some(205.0)));
         assert!(score.accepted);
         assert_eq!(score.duration_delta_secs, Some(5.0));
+    }
+
+    #[test]
+    fn retrouve_l_artiste_dans_le_titre_d_une_video_de_paroles_ou_sans_chaine() {
+        // Relevés réels du Top 50 (20/11) : refusés avant, faute de chaîne qui porte l'artiste.
+        assert!(score_match(info("Last Christmas", "Wham!", Some(263.0)), info("Wham! - Last Christmas (Lyrics)", "7clouds", Some(264.0))).accepted);
+        assert!(score_match(info("J'assume", "RnBoi", Some(178.0)), info("RnBoi - J’assume", "", Some(179.0))).accepted);
+        assert!(score_match(info("Jet Lag", "Tiakola, Jorja Smith", Some(181.0)), info("Tiakola x Jorja Smith - Jet Lag (Paroles/Lyrics)", "TV RAP FRANCE", Some(179.0))).accepted);
+        assert!(score_match(info("Fille à Papa", "Vacra, La Rvfleuze", Some(170.0)), info("Vacra - Fille à Papa ft. La Rvfleuze (Clip Officiel)", "Vacra", Some(169.0))).accepted);
+        assert!(score_match(
+            info("Cuenta (feat. Meryl & Shay)", "Ronisia, Meryl, Shay", Some(184.0)),
+            info("Ronisia - Cuenta (Clip officiel) ft. Meryl, Shay", "Ronisia", Some(184.0))
+        )
+        .accepted);
+        assert!(score_match(
+            info("Suzuki (from GTAVI: The Album)", "Fuerza Regida, Grand Theft Auto VI", Some(112.0)),
+            info("Fuerza Regida - Suzuki (From Grand Theft Auto VI: The Album)", "Atlantic Records", Some(112.0))
+        )
+        .accepted);
+        // Toujours refusés : une reprise, un autre artiste, un autre morceau.
+        assert!(!score_match(info("Blinding Lights", "The Weeknd", Some(200.0)), info("The Weeknd - Blinding Lights (Cover by Loi)", "loimusic", Some(147.0))).accepted);
+        assert!(!score_match(info("Royals", "Lorde", Some(190.0)), info("Royals (Lyrics)", "7clouds", Some(190.0))).accepted);
+        assert!(!score_match(info("4", "Mauvais djo", Some(140.0)), info("Mauvais djo - AIRBNB 4 (Clip Officiel)", "Mauvais djo", Some(141.0))).accepted);
+    }
+
+    #[test]
+    fn retire_les_mentions_ajoutees_par_spotify() {
+        assert_eq!(super::core_title("Flower In A Hurricane (feat. SZA) [From GTAVI: Original Score]"), "Flower In A Hurricane");
+        assert_eq!(super::core_title("Suzuki (from GTAVI: The Album)"), "Suzuki");
+        assert_eq!(super::core_title("Mélo (Remix)"), "Mélo (Remix)");
+        assert_eq!(super::core_title("(I Can't Get No) Satisfaction"), "(I Can't Get No) Satisfaction");
     }
 
     #[test]

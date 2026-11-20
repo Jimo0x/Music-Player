@@ -9,6 +9,37 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Demande de fusion : aucun commit ne porte de ligne d'attribution (co-auteur, « Generated
+  # with … », lien de session). GitHub compte chaque co-auteur nommé parmi les contributeurs.
+  commits:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Messages des commits sans attribution
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          bad=0
+          for c in $(git rev-list "$BASE..$HEAD"); do
+            found=$(git log -1 --format=%B "$c" | grep -inE '^[[:space:]]*co-authored-by:|generated with|^[[:space:]]*[a-z]+-session:[[:space:]]*https?://' || true)
+            if [ -n "$found" ]; then
+              echo "::error::Commit $(git log -1 --format='%h %s' "$c") : ligne d'attribution à retirer"
+              echo "$found"
+              bad=1
+            fi
+          done
+          if [ "$bad" = 1 ]; then
+            echo "Voir CONTRIBUTING.md, règle d'or n° 7 : git rebase -i main, puis « reword » sur ces commits."
+            exit 1
+          fi
+          echo "Aucune ligne d'attribution dans les commits de cette demande."
+
   # Feedback rapide sur chaque push/PR : lint + tests backend (Rust) et
   # frontend (Vue), sans construire d'installeur. Tourne uniquement sur
   # Windows depuis le 11/11 : les machines Linux de GitHub n'arrivaient plus à télécharger les
