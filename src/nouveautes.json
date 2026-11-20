@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.10.4",
+    "date": "2026-11-20",
+    "items": [
+      "Télécharger les manquants (import Spotify) : bien plus de morceaux sont trouvés. L'artiste est aussi reconnu dans le titre de la vidéo, les morceaux à plusieurs artistes passent, et les mentions comme « (feat. …) » ou « [From …] » ne gênent plus.",
+      "Un lien partagé depuis l'appli Spotify (spotify.link) se télécharge directement, sans passer par le navigateur."
+    ]
+  },
+  {
     "version": "0.10.3",
     "date": "2026-11-20",
     "items": [
