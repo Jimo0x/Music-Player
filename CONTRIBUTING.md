@@ -34,6 +34,13 @@ la façon dont il avance. Lis-le en entier avant ta première contribution. En c
    autre chose que l'appli.
 6. **Pas de secret** : aucune clé, aucun mot de passe, aucun jeton, jamais, même « pour
    tester ».
+7. **Aucune attribution à un outil dans l'historique.** Tu peux t'aider de l'outil de ton
+   choix, mais tes commits n'en portent aucune trace : pas de ligne `Co-Authored-By:`, pas de
+   « Generated with … », pas de lien vers une session (`…-Session: https://…`). GitHub ajoute
+   chaque co-auteur nommé à la liste des contributeurs du dépôt. Une personne qui a contribué
+   ouvre sa propre demande de fusion. La CI refuse un commit qui porte une de ces lignes
+   (tâche « commits »). Si ton outil les ajoute tout seul, coupe ce réglage, ou retire-les avant
+   de pousser : `git rebase -i main`, puis `reword` sur chaque commit concerné.
 
 ## Mise en place
 
@@ -155,6 +162,7 @@ parle d'abord dans une issue.
 - Une fonctionnalité non validée, ou différente de ce qui était convenu.
 - Un écran cassé sur téléphone, en thème clair ou en thème sombre.
 - Une donnée personnelle, un secret, ou une zone protégée modifiée sans accord.
+- Un commit avec une ligne `Co-Authored-By:`, « Generated with … » ou un lien de session.
 - Pas de test pour la logique ajoutée.
 
 Merci de ton aide, et bienvenue dans le projet !
