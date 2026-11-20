@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.10.2",
+    "date": "2026-11-20",
+    "items": [
+      "Téléphone : la mise à jour se fait de nouveau dans l'appli. Android télécharge la nouvelle version (même sur une connexion lente, avec reprise), puis ouvre l'installation, sans passer par le navigateur.",
+      "Avant l'installation, l'appli vérifie que le fichier reçu est exactement celui publié. S'il a été abîmé pendant le téléchargement, il est effacé et retéléchargé.",
+      "Le bouton « Télécharger avec le navigateur » reste disponible en secours."
+    ]
+  },
+  {
     "version": "0.10.1",
     "date": "2026-11-20",
     "items": [
