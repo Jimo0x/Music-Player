@@ -1,130 +1,191 @@
 # État du projet
 
-Mis à jour le 18 novembre 2026, à la publication de la **0.9.0**. À tenir à jour à chaque
-version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
+Mis à jour le **20 novembre 2026** : **0.10.1** publiée, un travail en cours sur une branche
+locale (voir ci-dessous). À tenir à jour à chaque version : ce qui vient de sortir, ce qui
+reste, ce qui n'a pas été vérifié.
+
+## En cours : à reprendre en premier
+
+### Retour à l'ancienne mise à jour Android (décision du propriétaire, 20/11)
+
+Pourquoi : la mise à jour par le navigateur bloque parfois et peut abîmer le fichier. Le 19/11,
+la 0.10.0 refusait de s'installer sur le Pixel 6 Pro : le journal d'Android disait « SHA-256
+digest of contents did not verify » ; l'APK téléchargé par le navigateur avait la bonne taille
+mais un contenu différent de l'APK publié (empreintes `2addc7b3…` contre `1b6f1cf0…`). L'APK
+publié était sain (installé ensuite par câble, `adb install -r`, données gardées).
+
+Fait (branche **locale** `wip/mise-a-jour-dans-l-appli`, commit `d5b810c`, **non poussée**) :
+annulation exacte du retrait `cf04e2a` (`git apply -R`) sur `scripts/android-patch.mjs`,
+`src/stores/updater.ts` et `src/lib/androidMedia.ts`. Le bloc `UpdateBridge.kt` n'avait pas
+bougé depuis le retrait (vérifié). Revient : permission `REQUEST_INSTALL_PACKAGES`,
+`UpdateFileProvider` + `res/xml/update_paths.xml`, `UpdateNowReceiver`,
+`UpdateDownloadedReceiver`, téléchargement par le service d'Android avec nouveaux essais,
+notification « Prête à installer », `AndroidUpdate.download(url, version)` et `__mpUpdate`.
+Le bouton « Télécharger avec le navigateur » reste en secours. Lint, types et tests verts.
+
+Reste à faire, dans l'ordre :
+1. **Vérifier l'empreinte SHA-256 de l'APK avant l'installation.** L'API des versions de
+   GitHub donne `"digest": "sha256:…"` pour chaque fichier (vérifié sur la 0.10.1). Ajouter un
+   champ `sha256` à `UpdateInfo` (`src-tauri/src/updater.rs`, `newest_apk_for` lit
+   `asset["digest"]`), le passer à `AndroidUpdate.download(url, version, sha256)`, et dans
+   `UpdateBridge.watch` (après `STATUS_SUCCESSFUL`) comme dans `UpdateDownloadedReceiver`,
+   comparer avant `launchInstaller` / `notifyReady` ; si l'empreinte diffère : supprimer le
+   fichier, un nouvel essai, puis un message clair. Test Rust sur la lecture du champ.
+2. **Essai réel sur l'émulateur** : compiler en local avec une version plus basse que la
+   dernière publiée, signée avec la **clé de version** (`%USERPROFILE%\.music-player-android\`
+   : `release.p12` et ses secrets en fichiers texte, voir le LISEZ-MOI du dossier), l'installer,
+   laisser l'appli proposer la version GitHub, la télécharger et l'installer d'elle-même.
+3. Nouveautés (`src/nouveautes.json`) puis publication (correctif 0.10.2).
+4. Risque connu et accepté : Play Protect réagissait à cette méthode (0.5.16 à 0.7.0). Si
+   l'alerte revient : voir « Play Protect » plus bas.
 
 ## Versions récentes
 
 | Version | Date | Contenu principal |
 | --- | --- | --- |
-| 0.9.0 | 18/11/2026 | Sons Dolby (AC-3/E-AC-3 5.1) lus partout en Rust pur ; Opus en .m4a lu sans ffmpeg (Audiolab) ; commandes de l'écran verrouillé et touches multimédias sur Windows et Linux (MPRIS) ; page Télécharger (lien direct, lien Spotify, recherche) ; boutons de l'import Spotify remis ; propositions en fin de file ; premier scan qui montre son avancement et ne bloque plus ; visualiseur allégé en mode léger ; tri dans Titres aimés ; Mo et temps restant pendant un envoi dans la discussion |
-| 0.8.0 | 18/11/2026 | Cartes de paroles « Arcane » (tarot) ; bouton retour Android = MENU en mode baladeur ; noms d'artistes tirés des titres de vidéos nettoyés ; avancement des téléchargements ; CSP activée ; partage Wi-Fi chiffré ; relais sans routes de compte ; actions CI v5 ; styles en variables du thème ; lot playlists (sélection multiple, ajout à plusieurs playlists, tri dans une playlist, ajout depuis l'écran de lecture) ; guide du contributeur |
+| 0.10.1 | 20/11/2026 | Trois corrections du contributeur : liens de playlist ou d'album = un morceau par tâche, un son partagé depuis un Mix YouTube reste un seul son (`--no-playlist`, `noplaylist`) ; recherche avec le titre seul ; liens Spotify courts (explication) et anciens `play.spotify.com` ; synchronisation des appareils liés qui dit pourquoi elle attend et reprend au retour dans l'appli |
+| 0.10.0 | 19/11/2026 | Téléchargement sur téléphone (yt-dlp intégré : Python 3.11 par Chaquopy 17.2.0) ; liens Spotify lus sans spotDL (page « embed », 100 morceaux au plus) ; recherche à la façon de spotDL (5 candidats, notre correspondance choisit) ; « Quoi de neuf ? » ; listes déroulantes lisibles. APK plus gros : arm64 58 Mo, armv7 43 Mo, complet 91 Mo |
+| 0.9.0 | 18/11/2026 | Sons Dolby (AC-3/E-AC-3 5.1) lus partout en Rust pur ; Opus en .m4a lu sans ffmpeg (Audiolab) ; écran verrouillé et touches multimédias sur Windows et Linux (MPRIS) ; page Télécharger ; boutons de l'import Spotify remis ; propositions en fin de file ; premier scan qui montre son avancement et ne bloque plus ; visualiseur allégé en mode léger ; tri dans Titres aimés ; Mo et temps restant pendant un envoi dans la discussion |
+| 0.8.0 | 18/11/2026 | Cartes de paroles « Arcane » (tarot) ; bouton retour Android = MENU en mode baladeur ; noms d'artistes tirés des titres de vidéos nettoyés ; avancement des téléchargements ; CSP activée ; partage Wi-Fi chiffré ; relais sans routes de compte ; actions CI v5 ; styles en variables du thème ; lot playlists ; guide du contributeur |
 | 0.7.1 | 12/11/2026 | Play Protect : l'appli n'installe plus d'APK (mise à jour par le navigateur) ; page de playlist virtualisée ; envoi par code par parties ; salle du relais gardée pendant un transfert |
 | 0.7.0 | 12/11/2026 | Mode baladeur (téléphone) : boîtier, molette tactile, 5 finitions, paroles sur petit écran |
 | 0.6.1 | 12/11/2026 | Moteur de téléchargement testé pour de vrai (outils hors PATH, pièges de spotDL) |
 | 0.6.0 | 12/11/2026 | Moteur de téléchargement (file spotDL puis yt-dlp), import Spotify par lien, données du compte ou fichier |
 
-## Ce qui reste à faire
+## Avis des utilisateurs (8 sur le relais au 20/11)
 
-### Avis des utilisateurs encore ouverts
+Lus avec le code administrateur (`%USERPROFILE%\.music-player-avis\code-admin.txt`) :
+`POST https://music-player-relais.loickamg.workers.dev/v1/avis/liste` avec `{"admin": code}` ;
+`/v1/avis/supprimer` avec `{"admin", "id"}` ; `/v1/avis/image` avec `{"admin", "id", "n"}`.
+Ne supprimer qu'avec l'accord du propriétaire.
 
-- **Pochettes des playlists de Méryl** (Android 10, Chrome 114) : correction envoyée, jamais
-  vérifiée sur son téléphone. Les deux autres points de son avis (saisie de la discussion
-  sous le clavier, champ d'avis en pilule) sont corrigés depuis le 11/11.
-- Corrigés en 0.9.0, pas encore essayés sur téléphone (avis à marquer « Traité » une fois
-  confirmés) :
-  - **Audiolab** : WAV (16/24/32 bits, ADPCM) et AAC/.m4a étaient déjà lus sans ffmpeg ; le
-    trou était l'Opus rangé dans un .m4a, illisible sur Android. Désormais décodé par
-    `opus.rs` (paquets séparés par symphonia, en-tête « dOps » en gros-boutiste).
-  - **Tri dans Favoris** : mêmes tris que les playlists, gardés (`mp:tri-favoris`).
-  - **Avancement d'un envoi dans la discussion** : %, Mo envoyés sur le total, temps restant
-    et débit (calcul commun avec la section Partage : `src/lib/pace.ts`).
+| Avis (début de l'id) | Sujet | État |
+| --- | --- | --- |
+| `f49992b3` (Méryl, 18/11) | « Tout est réglé » | Confirme `bf3c947a` et `5422dd57` : **ces 3 avis peuvent être supprimés** (accord du propriétaire demandé le 20/11, pas encore donné) |
+| `bf3c947a`, `5422dd57` (Méryl) | Pochettes des playlists, saisie de la discussion, champ d'avis | Réglés (confirmés par `f49992b3`) |
+| `0f6f48d3` (19/11, 0.9.0) | Envoyer plusieurs sons d'un coup ; dans la discussion, « + » doit permettre de choisir plusieurs sons et plusieurs playlists | **À faire** |
+| `8a2b18bc` | Tri dans Favoris et les playlists | Fait (0.8.0 playlists, 0.9.0 Favoris), confirmation du testeur attendue |
+| `a6243c4d` | %, Mo et temps restant pendant un envoi | Fait en 0.9.0, confirmation attendue |
+| `86f96b44`, `23757f22` | Enregistrements Audiolab .wav/.m4a illisibles | Fait en 0.9.0 (le trou était l'Opus dans un .m4a), confirmation attendue |
 
-### Retours d'un testeur (Redmi 13C, version 0.7.1), traités le 18/11
+## À faire ensuite (ordre proposé au propriétaire le 20/11, pas encore tranché)
 
-- **Premier scan bloqué** à l'installation (contourné en installant une ancienne version,
-  puis en mettant à jour). Cause exacte non reproduite (pas d'appareil). Corrigé ce qui
-  pouvait l'expliquer : l'avancement s'affiche dès le premier scan (« Bienvenue » restait à
-  l'écran sans signe de vie) ; un fichier qui fait paniquer la lecture des étiquettes est
-  marqué abîmé au lieu de faire tomber le scan ; le drapeau « scan en cours » est toujours
-  remis à zéro ; accès à la musique accordé après coup → bibliothèque relue. **À vérifier**
-  avec une installation neuve sur un téléphone.
-- **Saccades** : le mode léger (automatique sur Mali-G52) ne touchait pas au visualiseur ;
-  en mode léger il dessine maintenant 20 images/s, sans halo, à densité 1.
-- **« Plus de morceaux » en fin de file** : propositions (réécouter, dans la même veine,
-  plus écoutés, titres aimés, playlists, à redécouvrir) dans « À l'écoute » et dans « À
-  suivre » (là, ajout à la suite du dernier morceau). Pas dans le mode baladeur.
+1. **Accès rapides sur téléphone** : Télécharger n'est accessible que par Réglages →
+   « Télécharger… » (sur PC : onglet de la barre latérale) ; le mode baladeur seulement par
+   Réglages → Personnalisation. Proposé : cartes d'accès rapide sur l'Accueil (Télécharger,
+   Mode baladeur, Importer de Spotify, Vocaux) et un bouton baladeur dans « À l'écoute ».
+2. **Notifications comme WhatsApp, appli fermée** (messages, sons, demandes des proches).
+   Aujourd'hui : tâche de fond `ProchesCheckJob` toutes les 15 min au mieux (Android la
+   repousse souvent de plusieurs heures) et option « Notifications instantanées » (service
+   `ProchesService`, vérification chaque minute, désactivée par défaut, souvent arrêtée par
+   les économiseurs de batterie). Proposé : notifications poussées par le relais via Firebase
+   Cloud Messaging (projet Firebase gratuit à créer par le propriétaire, clé de service en
+   secret du relais, `google-services.json` dans la construction), et la vérification actuelle
+   gardée en secours pour les téléphones sans services Google (Huawei de Méryl).
+3. **Envoi groupé** de sons et de playlists (avis `0f6f48d3`).
+4. **Lecteur plein écran sur l'écran verrouillé Android, façon Apple Music** (option B
+   choisie le 18/11) : activité affichée par-dessus l'écran verrouillé ; pour qu'elle s'ouvre
+   seule à l'allumage de l'écran, il faut l'autorisation « afficher par-dessus les autres
+   applis » (risque Play Protect à surveiller). Pas commencé.
+5. **Vérifications sur de vrais appareils** (liste plus bas).
+6. **Traduction** Français / English / langue du système, choisie par l'utilisateur (décision
+   du 19/11 : plus tard) : environ 1 200 textes (870 dans l'interface, 340 messages du moteur
+   Rust), 75 écrans.
+7. **Revue de sécurité, puis optimisation poussée**, une fois les fonctions confirmées.
 
-### Retours du 18/11 au soir
+### Points en attente d'une décision du propriétaire
 
-- **Téléchargements spotDL / yt-dlp invisibles** : la page « Importer de Spotify » (qui
-  contient la file de téléchargements depuis la 0.6.0) n'avait plus aucun bouton depuis la
-  mise en suspens de Spotify le 28/10. Boutons remis (Playlists → « Depuis Spotify »,
-  Réglages → « Importer de Spotify… »). Le travail fait avec ChatGPT (étapes 1 à 9 du
-  moteur) était bien intégré. Sur téléphone, pas de téléchargement (outils absents).
-- **Sons de The Weeknd illisibles sur le Moov Smart Pro** : 73 fichiers (Trilogy, Starboy,
-  After Hours, Kiss Land) en Dolby E-AC-3 5.1 dans des .m4a. Désormais décodés partout en Rust
-  pur (`dolby.rs`, filmcraft-ac3), au fil de la lecture, ramenés en stéréo au niveau de
-  ffmpeg, avec saut. Vérifié sur les 73 : durées exactes, son identique à ffmpeg
-  (corrélation 1,0000). **Pas encore essayé sur téléphone.**
-- **Écran verrouillé du PC** : commandes multimédias de Windows et de Linux (MPRIS : écran
-  verrouillé de KDE Plasma / CachyOS, GNOME) avec souvlaki, `media_controls.rs`, même pont que
-  la session média d'Android. Linux vérifié en conteneur (compilation, mises à jour, pas de bus
-  → rien tenté). **Pas encore essayé dans la vraie appli** (Windows ni Linux).
-- **Page « Télécharger »** (barre latérale, Réglages) : lien direct (yt-dlp, sans recherche),
-  lien Spotify (spotDL) ou « Artiste - Titre », playlist de destination, file partagée avec
-  l'import Spotify (`FetchJobs.vue`). Lien direct essayé pour de vrai (vidéo YouTube importée).
-- **Téléchargement sur téléphone (fait le 19/11, pas encore publié)** : yt-dlp intégré
-  (Python 3.11 par Chaquopy 17.2.0, `src-tauri/android/python/mp_ytdlp.py`, pont Rust → Kotlin
-  par JNI `fetch/android.rs` + `YtDlpBridge.kt`). yt-dlp lui-même est téléchargé et mis à jour
-  par l'appli (`fetch/ytdlp_zip.rs`, empreinte SHA-256 vérifiée, contrôle quotidien). Liens
-  Spotify lus sans spotDL (page embed, 100 morceaux au plus, avertissement si coupé) ;
-  recherche à la façon de spotDL (5 candidats, notre correspondance choisit). Sur téléphone :
-  travail dans les données privées, morceau rangé dans « Musique/Music Player/Téléchargés »
-  en .m4a, étiquettes écrites par l'appli. **Essayé de bout en bout sur l'émulateur Android
-  14** (« The Weeknd - Blinding Lights » : trouvé, téléchargé en 15 s, ajouté et lu). Reste :
-  essai sur un vrai téléphone, APK plus gros (Python, environ +20 Mo par processeur).
-- **Lecteur plein écran sur l'écran verrouillé Android** (option B) : pas commencé.
-- **Plus tard (décision du 19/11)** : appli entièrement traduisible (Français / English / langue
-  du système), environ 1 200 textes (870 dans l'interface, 340 messages du moteur Rust).
-- **Ensuite (demande du propriétaire)** : revue de sécurité, puis optimisation poussée, une
-  fois toutes les fonctions confirmées sur appareils.
+- Suppression des 3 avis de Méryl (voir le tableau des avis).
+- **Fichiers d'outillage publiés dans le dépôt**, contraire à sa règle globale (fichiers
+  d'outillage exclus par `.git/info/exclude`, aucun outil nommé dans un fichier versionné) :
+  le fichier de consignes à la racine (suivi depuis `6fa2185`, 18/11, bien que listé dans
+  `.git/info/exclude`), le lien du README vers lui (ligne « Pour reprendre le travail ») et le
+  document de prompt dans `docs/`. Proposé : retirer le fichier du suivi
+  (`git rm --cached`, il reste sur le disque), retirer le lien, retirer le document. Rien fait
+  sans son accord (suppression de fichiers du dépôt).
 
-### « Quoi de neuf ? » (après la 0.9.0, pas encore publié)
+## Vérifications sur de vrais appareils
 
-- Notes de chaque version dans `src/nouveautes.json` : fenêtre au premier lancement après une
-  mise à jour (versions sautées comprises), bouton dans Réglages → Mises à jour, notes de la
-  version proposée dans la fenêtre / le bandeau de mise à jour. La CI en fait le texte de la
-  version GitHub (`scripts/release-notes.mjs`) et refuse une version sans notes.
+Rien de cette liste n'a été essayé sur un vrai téléphone ou une vraie machine, sauf mention.
 
-### Vérifications sur de vrais appareils (rien de tout cela n'a été essayé sur téléphone)
-
-- CSP sur Android (vérifiée sur PC dans la vraie appli : écrans, pochettes, polices, relais).
-- Partage Wi-Fi chiffré entre deux téléphones.
+- **Pixel 6 Pro (Android 17)** : 0.10.0 installée par câble le 19/11 ; téléchargement sur
+  téléphone pas encore essayé par le propriétaire.
+- **Moov Smart Pro** (0.5.15 installée le 18/11) : sons Dolby de The Weeknd (Trilogy,
+  Starboy, After Hours, Kiss Land : 73 fichiers en E-AC-3 5.1) après mise à jour.
+- **Écran verrouillé du PC** dans la vraie appli (Windows) ; **Linux / CachyOS** (AppImage,
+  MPRIS vérifié seulement en conteneur).
+- Premier scan après une installation neuve ; propositions de fin de file ; visualiseur allégé.
+- CSP sur Android (vérifiée sur PC dans la vraie appli).
+- Partage Wi-Fi chiffré entre deux téléphones ; envoi d'une grosse playlist par code.
 - Noms d'artistes nettoyés sur la vraie bibliothèque.
-- Mode baladeur : sensation de la molette, clic, vibration, bouton retour, finitions Graphite
-  et Pistache (jamais affichées).
-- Envoi d'une grosse playlist par code (parties).
-- Import Spotify complet dans l'appli, avec la barre d'avancement.
-- Mise à jour par le navigateur, et absence d'alerte Play Protect à partir de la 0.8.0.
-- Clavier qui ne cache plus le champ de la discussion avec un proche.
-- Copie par lots de « Mes appareils » avec beaucoup de sons.
-- Appui long (sélection de morceaux) sur un vrai téléphone.
+- Mode baladeur : molette, clic, vibration, bouton retour, finitions Graphite et Pistache.
+- Import Spotify complet avec la barre d'avancement ; copie par lots de « Mes appareils ».
+- Clavier qui ne cache plus le champ de la discussion ; appui long (sélection de morceaux).
+- Synchronisation des appareils liés (0.10.1) avec deux vrais appareils.
 
-### Play Protect, si l'alerte revient
+## Play Protect, si l'alerte revient
 
 - Le choix de l'icône de l'appli désactive l'icône d'origine (ressemble à une appli qui se
   cache) : second suspect, laissé en place.
+- Le retour de l'installation par l'appli (`REQUEST_INSTALL_PACKAGES`) est le premier suspect.
 - Démarche que seul le propriétaire peut faire : vérification du développeur auprès de Google,
   ou publication sur le Play Store.
+- Essai du 19/11 sur l'émulateur Android 17 avec Play Store : analyse « This app looks safe »
+  pour la 0.10.0 (installation depuis Fichiers, mise à jour réussie).
 
-### Mis de côté par le propriétaire
+## Contributeur
+
+**Jimo0x** (fork `Jimo0x/Music-Player`, branches `correctif/…`). Demandes #1, #2 et #3
+relues, essayées, approuvées et fusionnées le 20/11 (merge commits `c127aa4`, `41e89cb`,
+`aaf7075`) ; #2 d'abord renvoyée pour correction (son d'un Mix YouTube → 500 téléchargements),
+corrigée en `09cfaaa` et `92d0536`. #4 et #5 : demandes de test de la CI, fermées par lui sans
+fusion. Le guide (`CONTRIBUTING.md`) explique où lire les relectures et comment régler ses
+notifications GitHub. Toute relecture commence par **@Jimo0x** (sinon il n'est pas toujours
+prévenu).
+
+## Fait les 18-20/11 (détail utile)
+
+- **Premier scan bloqué** (testeur, Redmi 13C, 0.7.1) : cause exacte non reproduite ; corrigé
+  ce qui pouvait l'expliquer (avancement affiché dès le premier scan, fichier piégé marqué
+  abîmé au lieu de faire tomber le scan, drapeau « scan en cours » toujours remis à zéro,
+  bibliothèque relue quand l'accès à la musique est accordé après coup).
+- **Saccades** : en mode léger, le visualiseur dessine 20 images/s, sans halo, à densité 1.
+- **Fin de file** : propositions (réécouter, dans la même veine, plus écoutés, titres aimés,
+  playlists, à redécouvrir) dans « À l'écoute » et « À suivre ». Pas dans le mode baladeur.
+- **Téléchargements invisibles** : la page « Importer de Spotify » n'avait plus de bouton
+  depuis la mise en suspens de Spotify (28/10) ; boutons remis. Le moteur de téléchargement
+  (étapes 1 à 9 écrites avec un assistant extérieur puis relues) était bien intégré.
+- **Dolby** : `dolby.rs` (filmcraft-ac3), décodage au fil de la lecture, stéréo au niveau de
+  ffmpeg, saut ; vérifié sur les 73 fichiers (durées exactes, corrélation 1,0000 avec ffmpeg).
+- **Téléchargement sur téléphone** : essayé de bout en bout sur l'émulateur Android 14
+  (« The Weeknd - Blinding Lights » trouvé, téléchargé en 15 s, rangé dans
+  « Musique/Music Player/Téléchargés » en .m4a, lu).
+
+## Mis de côté par le propriétaire
 
 - Spotify (accès retirés, code gardé ; l'import par lien et les téléchargements restent).
-- **Plus tard** : remettre (ou proposer en option) l'ancienne mise à jour Android, installée
-  par l'appli elle-même (code retiré dans cf04e2a : `AndroidUpdate.download`, `__mpUpdate`,
-  service de téléchargement). Décision du 18/11 : on garde le navigateur pour l'instant,
-  l'ancienne méthode faisait réagir Play Protect à chaque mise à jour.
-- Le lecteur sur l'écran verrouillé n'est plus mis de côté : option B choisie le 18/11.
 
 ## Repères techniques récents
 
-- Moteur de téléchargement : `src-tauri/src/fetch/` (file persistante, `drain_queue` testée,
-  adaptateurs spotDL et yt-dlp, import vérifié par correspondance, lien Spotify par
-  `spotdl save`).
+- Moteur de téléchargement : `src-tauri/src/fetch/` : file persistante (`queue.rs`,
+  `drain_queue` testée), adaptateurs spotDL et yt-dlp (`spotdl.rs`, `ytdlp.rs` : 5 candidats,
+  `pick_candidate`, `read_media_link` pour les liens de playlist), correspondance
+  (`matching.rs`), import (`import.rs` : extension réelle gardée, dossier de travail à part,
+  copie entre espaces de stockage), liens Spotify (`link.rs`, `spotify_embed.rs`).
+- Téléphone : `fetch/android.rs` (pont JNI vers `YtDlpBridge.kt`), `fetch/ytdlp_zip.rs`
+  (yt-dlp téléchargé, SHA-256 vérifié, contrôle quotidien),
+  `src-tauri/android/python/mp_ytdlp.py` (copié par `android-patch.mjs`, règle R8
+  `proguard-ytdlp.pro`), morceaux rangés par `sharing::downloads_dir`.
+- Sons : `dolby.rs`, `opus.rs` (Ogg et MP4), `audio.rs::open_decoder`.
+- Écran verrouillé et touches multimédias (PC) : `media_controls.rs` (souvlaki : Windows SMTC,
+  Linux MPRIS par zbus), pont dans `src/lib/androidMedia.ts`.
+- « Quoi de neuf ? » : `src/nouveautes.json`, `src/lib/whatsNew.ts`,
+  `src/components/WhatsNew.vue`, `scripts/release-notes.mjs` (texte des versions GitHub).
+- Interface : `DownloadView.vue`, `FetchJobs.vue`, `EndOfQueue.vue` + `src/lib/suggestions.ts`,
+  `src/lib/pace.ts` (débit et temps restant).
 - Partage : `remote.rs` (par code, SPAKE2 + ChaCha20-Poly1305, parties), `nearby.rs` +
-  `sealed.rs` (Wi-Fi, chiffré depuis 0.8.0), `sharing.rs` (archives `.mpshare`).
+  `sealed.rs` (Wi-Fi, chiffré), `sharing.rs` (archives `.mpshare`).
 - Relais Cloudflare : `relay/src/index.js` (Durable Objects Salle, Profil, Zone, Avis, Colis).
 - Mode baladeur : `src/components/Baladeur.vue`, `src/lib/baladeur.ts`, `src/stores/baladeur.ts`.
-- Sélection multiple et playlists : `src/components/SelectionBar.vue`,
-  `src/components/AddToPlaylists.vue`, `src/lib/selection.ts`, `src/lib/trackSort.ts`.
+- Sélection multiple et playlists : `SelectionBar.vue`, `AddToPlaylists.vue`,
+  `src/lib/selection.ts`, `src/lib/trackSort.ts`.
