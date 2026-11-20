@@ -16,7 +16,7 @@ interface AndroidMediaBridge {
 }
 
 interface AndroidUpdateBridge {
-  download(url: string, version: string): void;
+  download(url: string, version: string, sha256: string): void;
   openInBrowser(url: string): void;
   backgroundAllowed?(): boolean;
   openBatterySettings?(): void;

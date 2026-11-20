@@ -765,7 +765,7 @@ import java.net.URL
 
 class UpdateFileProvider : FileProvider()
 
-data class Release(val version: String, val url: String, val size: Long)
+data class Release(val version: String, val url: String, val size: Long, val sha256: String)
 
 /**
  * Mises à jour : recherche de la dernière version sur GitHub (APK du processeur du
@@ -843,17 +843,50 @@ object Updates {
         if (any == null) any = a
       }
       val chosen = own ?: universal ?: any ?: continue
-      best = Release(version, chosen.optString("browser_download_url"), chosen.optLong("size"))
+      best = Release(version, chosen.optString("browser_download_url"), chosen.optLong("size"), digestOf(chosen))
       bestKey = key
     }
     return best
+  }
+
+  /** « sha256:9a42… » (champ digest de GitHub) → empreinte en minuscules, ou "" si absente. */
+  fun digestOf(asset: JSONObject): String {
+    val hex = asset.optString("digest").removePrefix("sha256:").lowercase()
+    return if (hex.length == 64 && hex.all { it in '0'..'9' || it in 'a'..'f' }) hex else ""
+  }
+
+  /** Empreinte SHA-256 d'un fichier, en minuscules. */
+  fun sha256Of(file: File): String {
+    val md = java.security.MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+      val buffer = ByteArray(1 shl 16)
+      while (true) {
+        val n = input.read(buffer)
+        if (n < 0) break
+        md.update(buffer, 0, n)
+      }
+    }
+    return md.digest().joinToString("") { "%02x".format(it) }
+  }
+
+  /** L'APK téléchargé est-il exactement celui publié ? Sinon il est effacé : un fichier abîmé
+   *  ou modifié n'est jamais proposé à l'installation. Sans empreinte connue : accepté. */
+  fun verifyApk(context: Context): Boolean {
+    val expected = prefs(context).getString("download_sha256", null).orEmpty()
+    if (expected.isEmpty()) return true
+    val file = apkFile(context)
+    val ok = file.exists() && try { sha256Of(file) == expected } catch (e: Exception) { false }
+    if (!ok) file.delete()
+    return ok
   }
 
   fun apkFile(context: Context): File =
     File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), APK_NAME)
 
   /** Lance le téléchargement par Android ; renvoie son identifiant. */
-  fun download(context: Context, url: String, version: String): Long {
+  fun download(context: Context, url: String, version: String, sha256: String): Long {
+    // Adresses du projet seulement : la page ne peut pas faire télécharger un autre fichier.
+    require(url.startsWith("https://github.com/LoickAmg/Music-Player/releases/download/")) { "adresse de mise à jour refusée." }
     val dm = context.getSystemService(DownloadManager::class.java)
     val previous = prefs(context).getLong("download", -1L)
     if (previous >= 0) dm.remove(previous)
@@ -867,7 +900,8 @@ object Updates {
       .setAllowedOverMetered(true)
       .setAllowedOverRoaming(true)
     val id = dm.enqueue(request)
-    prefs(context).edit().putLong("download", id).putString("download_version", version).apply()
+    prefs(context).edit().putLong("download", id).putString("download_version", version)
+      .putString("download_url", url).putString("download_sha256", sha256.lowercase()).apply()
     context.getSystemService(NotificationManager::class.java).cancel(NOTIFY_AVAILABLE)
     return id
   }
@@ -925,6 +959,7 @@ object Updates {
       .putString("notified", release.version)
       .putString("pending_url", release.url)
       .putString("pending_version", release.version)
+      .putString("pending_sha256", release.sha256)
       .apply()
     ensureChannel(context)
     val open = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
@@ -1012,7 +1047,11 @@ class UpdateNowReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
     val prefs = Updates.prefs(context)
     val url = prefs.getString("pending_url", null) ?: return
-    Updates.download(context, url, prefs.getString("pending_version", null) ?: "")
+    try {
+      Updates.download(context, url, prefs.getString("pending_version", null) ?: "", prefs.getString("pending_sha256", null) ?: "")
+    } catch (e: Exception) {
+      // Adresse refusée ou service de téléchargement indisponible : la notification reste.
+    }
   }
 }
 
@@ -1023,9 +1062,29 @@ class UpdateDownloadedReceiver : BroadcastReceiver() {
     val prefs = Updates.prefs(context)
     if (id < 0 || id != prefs.getLong("download", -1L) || Updates.watchedByPage) return
     val state = Updates.query(context, id) ?: return
-    if (state[0].toInt() == DownloadManager.STATUS_SUCCESSFUL) {
-      Updates.notifyReady(context, prefs.getString("download_version", null) ?: "")
-    }
+    if (state[0].toInt() != DownloadManager.STATUS_SUCCESSFUL) return
+    // Empreinte (≈60 Mo) calculée hors du fil principal.
+    val pending = goAsync()
+    Thread {
+      try {
+        if (Updates.verifyApk(context)) {
+          prefs.edit().remove("sha_retry").apply()
+          Updates.notifyReady(context, prefs.getString("download_version", null) ?: "")
+        } else if (!prefs.getBoolean("sha_retry", false)) {
+          // Fichier abîmé : un seul nouvel essai ; ensuite, rien n'est proposé à l'installation.
+          prefs.edit().putBoolean("sha_retry", true).apply()
+          val url = prefs.getString("download_url", null)
+          if (url != null) {
+            Updates.download(context, url, prefs.getString("download_version", null) ?: "", prefs.getString("download_sha256", null) ?: "")
+          }
+        } else {
+          prefs.edit().remove("sha_retry").apply()
+        }
+      } catch (e: Exception) {
+      } finally {
+        pending.finish()
+      }
+    }.start()
   }
 }
 
@@ -1038,15 +1097,15 @@ class UpdateBridge(private val activity: Activity) {
   @Volatile private var installPending = false
 
   @JavascriptInterface
-  fun download(url: String, version: String) {
+  fun download(url: String, version: String, sha256: String) {
     val id = try {
-      Updates.download(activity, url, version)
+      Updates.download(activity, url, version, sha256)
     } catch (e: Exception) {
       report("error", JSONObject.quote(e.message ?: e.toString()))
       return
     }
     Updates.watchedByPage = true
-    Thread { watch(id, url, version) }.start()
+    Thread { watch(id, url, version, sha256) }.start()
   }
 
   /** Échec passager (serveur de GitHub surchargé, réponse 5xx ; connexion coupée) : on
@@ -1057,10 +1116,11 @@ class UpdateBridge(private val activity: Activity) {
       reason == DownloadManager.ERROR_CANNOT_RESUME ||
       reason == DownloadManager.ERROR_UNKNOWN
 
-  private fun watch(firstId: Long, url: String, version: String) {
+  private fun watch(firstId: Long, url: String, version: String, sha256: String) {
     val delays = longArrayOf(10, 30, 60, 120)
     var id = firstId
     var attempt = 0
+    var damaged = 0
     while (true) {
       val state = Updates.query(activity, id)
       if (state == null) {
@@ -1071,6 +1131,24 @@ class UpdateBridge(private val activity: Activity) {
       val status = state[0].toInt()
       when (status) {
         DownloadManager.STATUS_SUCCESSFUL -> {
+          report("waiting", JSONObject.quote("Vérification du fichier…"))
+          if (!Updates.verifyApk(activity)) {
+            // Contenu différent de l'APK publié (téléchargement abîmé) : effacé, un nouvel essai.
+            if (damaged++ < 1) {
+              report("waiting", JSONObject.quote("Fichier abîmé pendant le téléchargement : nouvel essai…"))
+              id = try {
+                Updates.download(activity, url, version, sha256)
+              } catch (e: Exception) {
+                Updates.watchedByPage = false
+                report("error", JSONObject.quote(e.message ?: e.toString()))
+                return
+              }
+              continue
+            }
+            Updates.watchedByPage = false
+            report("error", JSONObject.quote("le fichier reçu ne correspond pas à la version publiée (abîmé deux fois). Réessaie plus tard ou sur un autre réseau."))
+            return
+          }
           Updates.watchedByPage = false
           report("progress", "1")
           activity.runOnUiThread { launchInstaller() }
@@ -1085,7 +1163,7 @@ class UpdateBridge(private val activity: Activity) {
               Thread.sleep(1000)
             }
             id = try {
-              Updates.download(activity, url, version)
+              Updates.download(activity, url, version, sha256)
             } catch (e: Exception) {
               Updates.watchedByPage = false
               report("error", JSONObject.quote(e.message ?: e.toString()))

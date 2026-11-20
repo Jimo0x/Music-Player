@@ -219,6 +219,8 @@ export interface UpdateInfo {
   url: string | null;
   /** Android : taille de l'APK (octets). */
   size: number | null;
+  /** Android : empreinte SHA-256 publiée par GitHub, vérifiée avant l'installation. */
+  sha256: string | null;
 }
 
 /** File de téléchargements (spotDL puis yt-dlp), miroir de `fetch::queue::QueueItem`. */

@@ -72,7 +72,7 @@ export const useUpdaterStore = defineStore("updater", {
             this.message = `Téléchargement impossible : ${value}`;
           }
         };
-        window.AndroidUpdate.download(url, this.available?.version ?? "");
+        window.AndroidUpdate.download(url, this.available?.version ?? "", this.available?.sha256 ?? "");
         return;
       }
       let off: UnlistenFn | null = null;

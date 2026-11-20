@@ -17,6 +17,18 @@ pub struct UpdateInfo {
     pub url: Option<String>,
     /// Android : taille de l'APK (octets).
     pub size: Option<u64>,
+    /// Android : empreinte SHA-256 de l'APK publiée par GitHub (64 caractères hexadécimaux),
+    /// comparée au fichier téléchargé avant de l'installer.
+    pub sha256: Option<String>,
+}
+
+/// `"sha256:9a42…"` (champ `digest` d'un fichier de version GitHub) → empreinte en minuscules.
+fn sha256_of(asset: &serde_json::Value) -> Option<String> {
+    let hex = asset["digest"]
+        .as_str()?
+        .strip_prefix("sha256:")?
+        .to_ascii_lowercase();
+    (hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit())).then_some(hex)
 }
 
 /// APK de ce téléphone : chaque version publie un APK par type de processeur (deux fois plus
@@ -94,6 +106,7 @@ fn newest_apk_for(releases: &serde_json::Value, current: &str, abi: &str) -> Opt
                 notes: release["body"].as_str().map(str::to_string),
                 url: Some(url.to_string()),
                 size: asset["size"].as_u64(),
+                sha256: sha256_of(asset),
             },
         ));
     }
@@ -140,6 +153,7 @@ pub async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>, String> 
             notes: u.body.clone(),
             url: None,
             size: None,
+            sha256: None,
         }))
     }
     #[cfg(mobile)]
@@ -214,6 +228,32 @@ mod tests {
         assert_eq!(arm64.size, Some(17));
         let x86 = newest_apk_for(&split, "0.4.8", "x86").unwrap();
         assert_eq!(x86.url.as_deref(), Some("https://a/u.apk"));
+        assert_eq!(x86.sha256, None);
+    }
+
+    #[test]
+    fn reads_the_sha256_github_publishes_for_the_apk() {
+        let hex = "9a420577eabae20cf8629a7764c464ca8e7ba4a7d9a6ba8fd26220479812e163";
+        let releases = serde_json::json!([{ "tag_name": "app-v0.10.1", "assets": [
+            { "name": "Music-Player-android-arm64.apk", "browser_download_url": "https://a/arm64.apk", "digest": format!("sha256:{}", hex.to_uppercase()) },
+            { "name": "Music-Player-android-armv7.apk", "browser_download_url": "https://a/armv7.apk", "digest": "sha256:court" },
+            { "name": "Music-Player-android.apk", "browser_download_url": "https://a/u.apk", "digest": format!("md5:{hex}") }
+        ]}]);
+        assert_eq!(
+            newest_apk_for(&releases, "0.10.0", "arm64")
+                .unwrap()
+                .sha256
+                .as_deref(),
+            Some(hex)
+        );
+        assert_eq!(
+            newest_apk_for(&releases, "0.10.0", "armv7").unwrap().sha256,
+            None
+        );
+        assert_eq!(
+            newest_apk_for(&releases, "0.10.0", "x86").unwrap().sha256,
+            None
+        );
     }
 
     /// Interroge vraiment GitHub : `cargo test -- --ignored github`.
