@@ -1,5 +1,18 @@
 [
   {
+    "version": "0.11.0",
+    "date": "2026-11-21",
+    "items": [
+      "Recherche : la barre de recherche cherche aussi sur Internet. Un son absent de la bibliothèque se trouve et se télécharge d'un geste (onglet « Sur Internet »).",
+      "Discussion : plusieurs sons ou plusieurs playlists s'envoient d'un coup, avec l'avancement « 2 sur 5 ».",
+      "Barre de sélection : « Envoyer » partage les sons choisis avec un proche.",
+      "Une playlist jointe à un message n'est plus limitée à 300 morceaux : la liste complète arrive (le proche doit avoir cette version).",
+      "Télécharger : sur téléphone, les titres des résultats tiennent sur deux lignes au lieu d'être coupés."
+    ] » ne gênent plus.",
+      "Un lien partagé depuis l'appli Spotify (spotify.link) se télécharge directement, sans passer par le navigateur."
+    ]
+  },
+  {
     "version": "0.10.4",
     "date": "2026-11-20",
     "items": [
