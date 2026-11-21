@@ -169,3 +169,25 @@ describe("playlist de plus de 300 sons jointe (#10)", () => {
     expect(friends.error).toMatch(/mettre Music Player à jour/);
   });
 });
+
+describe("plusieurs playlists envoyées d'un coup (#9)", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("une playlist par message, le texte avec la première, chacune sous son nom", async () => {
+    const friends = useFriendsStore();
+    friends.me = { ...A };
+    friends.enabled = true;
+    friends.friends = [{ code: B.code, name: "Biggy03", avatar: null, readToken: TOKEN, since: 0, pubKey: await publicKey(B.secret) }];
+    const list = (nom: string, n: number) => ({ type: "playlist" as const, nom, morceaux: Array.from({ length: n }, (_, i) => ({ titre: `${nom} ${i}`, artiste: "A", album: "" })) });
+    expect(await friends.sendPlaylists(B.code, [list("Été", 3), list("Longue", 320)], "deux playlists")).toBe(2);
+    const lines = friends.conversations[B.code];
+    expect(lines.map((l) => [l.texte, l.piece?.type === "playlist" ? l.piece.nom : null])).toEqual([
+      ["deux playlists", "Été"],
+      ["", "Longue"],
+    ]);
+    // La seconde dépasse 300 morceaux : liste complète à côté (#10).
+    expect(lines[1].piece).toMatchObject({ total: 320 });
+    expect(friends.batches).toEqual({});
+    expect(friends.error).toBeNull();
+  }, 30_000);
+});
