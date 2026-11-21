@@ -128,3 +128,44 @@ describe("plusieurs sons envoyés d'un coup (#8)", () => {
     expect(friends.error).toMatch(/^1 son envoyé sur 3/);
   });
 });
+
+describe("playlist de plus de 300 sons jointe (#10)", () => {
+  beforeEach(() => localStorage.clear());
+  const morceaux = Array.from({ length: 450 }, (_, i) => ({ titre: `Titre ${i}`, artiste: "Damso", album: "QALF" }));
+
+  it("garde les 300 premiers dans le message et envoie la liste complète à côté", async () => {
+    const friends = useFriendsStore();
+    friends.me = { ...A };
+    friends.enabled = true;
+    friends.friends = [{ code: B.code, name: "Biggy03", avatar: null, readToken: TOKEN, since: 0, pubKey: await publicKey(B.secret) }];
+    expect(await friends.sendPlaylist(B.code, "", { type: "playlist", nom: "Longue", morceaux })).toBe(true);
+    const line = friends.conversations[B.code][0];
+    expect(line.piece).toMatchObject({ type: "playlist", nom: "Longue", total: 450 });
+    expect(line.piece?.type === "playlist" && line.piece.morceaux.length).toBe(300);
+    expect(friends.error).toBeNull();
+
+    // Chez le proche : la liste complète est reprise du colis.
+    setActivePinia(createPinia());
+    useShareStore().relay = BASE;
+    const other = useFriendsStore();
+    other.me = { ...B };
+    other.friends = [{ code: A.code, name: "Mahouna", avatar: null, readToken: TOKEN, since: 0, pubKey: await publicKey(A.secret) }];
+    other.conversations = { [A.code]: [{ ...line, mine: false }] };
+    expect(await other.receivePlaylist(A.code, line.at)).toBe(true);
+    const received = other.conversations[A.code][0].piece;
+    expect(received?.type === "playlist" && received.morceaux).toEqual(morceaux);
+  }, 30_000);
+
+  it("proche pas à jour : les 300 premiers, et on le dit", async () => {
+    const friends = useFriendsStore();
+    friends.me = { ...A };
+    friends.enabled = true;
+    friends.friends = [{ code: B.code, name: "Biggy03", avatar: null, readToken: TOKEN, since: 0, pubKey: null }];
+    await relay.post(B.code, "profil", { secret: B.secret, nom: "Biggy03" });
+    expect(await friends.sendPlaylist(B.code, "", { type: "playlist", nom: "Longue", morceaux })).toBe(true);
+    const piece = friends.conversations[B.code][0].piece;
+    expect(piece?.type === "playlist" && piece.morceaux.length).toBe(300);
+    expect(piece).not.toHaveProperty("colis");
+    expect(friends.error).toMatch(/mettre Music Player à jour/);
+  });
+});
