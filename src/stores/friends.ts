@@ -19,7 +19,9 @@ import { conversationKey, openWord, publicKey, sealWord } from "@/lib/e2e";
 import { alert } from "@/lib/alerts";
 import { api } from "@/lib/api";
 import { type RateSample, updateRate } from "@/lib/pace";
+import { toBase64 } from "@/lib/sync";
 import { PARCEL_MAX_BYTES, receiveParcel, sendParcel } from "@/lib/parcel";
+import { PIECE_INLINE_TRACKS, decodePlaylist, encodePlaylist, playlistIncomplete } from "@/lib/playlistParcel";
 import type { Track } from "@/lib/types";
 import { useAppearanceStore } from "./appearance";
 import { useLibraryStore } from "./library";
@@ -643,6 +645,67 @@ export const useFriendsStore = defineStore("friends", {
       if (sent < list.length) this.error = `${sent} son${sent > 1 ? "s" : ""} envoyé${sent > 1 ? "s" : ""} sur ${list.length}${lastWarning ? ` : ${lastWarning}` : "."}`;
       else if (lastWarning) this.error = lastWarning;
       return sent;
+    },
+    /**
+     * Playlist jointe (#10) : jusqu'à 300 morceaux, un message comme avant. Au-delà, les 300
+     * premiers restent dans le message (versions déjà installées, relais) et la liste complète
+     * part dans un colis chiffré à côté. Proche pas à jour : les 300 premiers, et on le dit.
+     */
+    async sendPlaylist(code: string, texte: string, piece: Piece): Promise<boolean> {
+      if (piece.type !== "playlist" || piece.morceaux.length <= PIECE_INLINE_TRACKS) return this.sendWord(code, texte, piece);
+      const friend = this.friends.find((f) => f.code === code);
+      if (!friend || !this.me || !this.base) return false;
+      const all = piece.morceaux;
+      const sent: Piece = { type: "playlist", nom: piece.nom, morceaux: all.slice(0, PIECE_INLINE_TRACKS), total: all.length };
+      let warning: string | null = null;
+      if (await this.peerKey(code)) {
+        const key = `out:${code}`;
+        const raw = encodePlaylist(all);
+        this.parcels[key] = { done: 0, total: raw.length };
+        try {
+          const who = { base: this.base, de: this.me.code, secret: this.me.secret };
+          // Lue par tranches dans la liste en mémoire (pas de fichier à préparer).
+          sent.colis = await sendParcel(who, raw.length, async (offset, len) => toBase64(raw.subarray(offset, offset + len)), (done, total) => {
+            this.parcels[key] = parcelStep(this.parcels[key], done, total);
+          });
+        } catch (e) {
+          warning = `La liste complète n'a pas pu être jointe (${e instanceof Error ? e.message : String(e)}) : seuls les ${PIECE_INLINE_TRACKS} premiers morceaux sont envoyés.`;
+          delete sent.total;
+        } finally {
+          delete this.parcels[key];
+        }
+      } else {
+        warning = `${friend.name} doit mettre Music Player à jour pour recevoir plus de ${PIECE_INLINE_TRACKS} morceaux : seuls les ${PIECE_INLINE_TRACKS} premiers sont envoyés.`;
+        delete sent.total;
+      }
+      const ok = await this.sendWord(code, texte, sent);
+      if (ok && warning) this.error = warning;
+      return ok;
+    },
+    /** Reprend la liste complète d'une playlist reçue (#10) ; renvoie vrai si elle est là. */
+    async receivePlaylist(code: string, at: number): Promise<boolean> {
+      const line = (this.conversations[code] ?? []).find((l) => l.at === at);
+      const piece = line?.piece;
+      if (!line || !piece || piece.type !== "playlist") return false;
+      if (!playlistIncomplete(piece)) return true;
+      if (!piece.colis || !this.base) return false;
+      const ref = piece.colis;
+      const key = `in:${ref.id}`;
+      this.parcels[key] = { done: 0, total: ref.taille };
+      try {
+        const chunks: string[] = [];
+        await receiveParcel(this.base, ref, async (data) => void chunks.push(data), (done, total) => {
+          this.parcels[key] = parcelStep(this.parcels[key], done, total);
+        });
+        const morceaux = decodePlaylist(chunks);
+        line.piece = { ...piece, morceaux, total: morceaux.length, colis: null };
+        this.saveWords();
+        delete this.parcels[key];
+        return true;
+      } catch (e) {
+        this.parcels[key] = { done: 0, total: ref.taille, error: e instanceof Error ? e.message : String(e) };
+        return false;
+      }
     },
     /** Reprend le fichier d'un son reçu dans la discussion ; renvoie le morceau importé. */
     async receivePiece(code: string, at: number): Promise<string | null> {

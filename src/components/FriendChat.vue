@@ -4,6 +4,7 @@ import type { Piece } from "@/lib/friendsApi";
 import type { Track } from "@/lib/types";
 import { LibraryMatcher, matchPlaylist } from "@/lib/spotifyImport";
 import { formatBytes } from "@/lib/format";
+import { pieceTrackCount, playlistIncomplete } from "@/lib/playlistParcel";
 import { pace } from "@/lib/pace";
 import { type ChatLine, MAX_TRACKS_AT_ONCE, type ParcelProgress, useFriendsStore } from "@/stores/friends";
 import { useLibraryStore } from "@/stores/library";
@@ -125,7 +126,7 @@ function attachPlaylist(id: string) {
   const morceaux = p.track_ids
     .map((tid) => library.byId(tid))
     .filter((t) => !!t)
-    .slice(0, 300)
+    // Plus de limite à 300 (#10) : au-delà, la liste complète part dans un colis chiffré.
     .map((t) => ({ titre: t!.title, artiste: t!.artist, album: t!.album }));
   if (morceaux.length) {
     piece.value = { type: "playlist", nom: p.name, morceaux };
@@ -175,7 +176,9 @@ async function send() {
       ? (await friends.sendTracks(friend.value.code, tracks, draft.value)) > 0
       : tracks.length
         ? await friends.sendTrack(friend.value.code, tracks[0], draft.value)
-        : await friends.sendWord(friend.value.code, draft.value, piece.value);
+        : piece.value?.type === "playlist"
+          ? await friends.sendPlaylist(friend.value.code, draft.value, piece.value)
+          : await friends.sendWord(friend.value.code, draft.value, piece.value);
   sending.value = false;
   if (ok) {
     draft.value = "";
@@ -213,9 +216,10 @@ function incoming(p: Piece) {
 }
 /** « Envoi du son… 42 % · 1,2 Mo sur 3 Mo · ≈ 10 s restantes · 300 Ko/s » (Mo et temps dès qu'ils sont connus). */
 function sendingText(p: ParcelProgress): string {
-  if (!p.total) return "Préparation du son…";
+  const what = piece.value?.type === "playlist" ? "de la liste complète" : "du son";
+  if (!p.total) return `Préparation ${what}…`;
   const left = pace(p.done, p.total, p.rate ?? null);
-  return `Envoi du son… ${percent(p)} % · ${formatBytes(p.done)} sur ${formatBytes(p.total)}${left ? ` · ${left}` : ""}`;
+  return `Envoi ${what}… ${percent(p)} % · ${formatBytes(p.done)} sur ${formatBytes(p.total)}${left ? ` · ${left}` : ""}`;
 }
 const percent = (p: { done: number; total: number } | null) => (p && p.total ? Math.round((p.done / p.total) * 100) : 0);
 const outgoing = computed(() => (friend.value ? (friends.parcels[`out:${friend.value.code}`] ?? null) : null));
@@ -230,7 +234,13 @@ function playlistMatch(p: Piece) {
   if (p.type !== "playlist") return null;
   return matchPlaylist(matcher.value, { name: p.nom, tracks: p.morceaux.map((m) => ({ title: m.titre, artist: m.artiste, album: m.album })) });
 }
-async function createPlaylist(p: Piece) {
+async function createPlaylist(p: Piece, line: ChatLine) {
+  // Plus de 300 morceaux (#10) : la liste complète est reprise d'abord (colis chiffré).
+  if (playlistIncomplete(p) && friend.value) {
+    const complete = await friends.receivePlaylist(friend.value.code, line.at);
+    if (!complete) ui.notify(`Liste complète indisponible : seuls les ${p.type === "playlist" ? p.morceaux.length : 0} premiers morceaux sont repris.`);
+    p = line.piece ?? p;
+  }
   const m = playlistMatch(p);
   if (!m || !m.found.length) return;
   const id = await playlists.create(m.name);
@@ -312,11 +322,11 @@ const liveTrack = computed(() => (live.value ? matcher.value.find({ title: live.
                   <div class="card-text">
                     <strong>{{ r.line.piece.nom }}</strong>
                     <small>
-                      {{ r.line.piece.morceaux.length }} morceau{{ r.line.piece.morceaux.length > 1 ? "x" : "" }}<template v-if="!r.line.mine"> · {{ playlistMatch(r.line.piece)!.found.length }} chez vous</template>
+                      {{ pieceTrackCount(r.line.piece) }} morceau{{ pieceTrackCount(r.line.piece) > 1 ? "x" : "" }}<template v-if="!r.line.mine"> · {{ playlistMatch(r.line.piece)!.found.length }}{{ playlistIncomplete(r.line.piece) ? "+" : "" }} chez vous</template>
                     </small>
                   </div>
                   <div class="card-action">
-                    <button v-if="!r.line.mine && playlistMatch(r.line.piece)!.found.length" type="button" class="round" aria-label="Créer cette playlist ici" title="Créer cette playlist ici" @click="createPlaylist(r.line.piece)">
+                    <button v-if="!r.line.mine && playlistMatch(r.line.piece)!.found.length" type="button" class="round" aria-label="Créer cette playlist ici" title="Créer cette playlist ici" @click="createPlaylist(r.line.piece, r.line)">
                       <Icon name="plus" :size="16" />
                     </button>
                   </div>
@@ -376,7 +386,7 @@ const liveTrack = computed(() => (live.value ? matcher.value.find({ title: live.
               <strong>{{ pieceTracks.length > 1 ? `${pieceTracks.length} sons` : piece.type === "morceau" ? piece.titre : piece.nom }}</strong>
               <small>{{
                 piece.type !== "morceau"
-                  ? `${piece.morceaux.length} morceaux`
+                  ? `${piece.morceaux.length} morceaux${piece.morceaux.length > 300 && !friend.pubKey ? " (300 premiers : proche pas à jour)" : ""}`
                   : !friend.pubKey
                     ? "Titre seulement (proche pas à jour)"
                     : pieceTracks.length > 1

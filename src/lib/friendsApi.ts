@@ -64,7 +64,15 @@ export interface ParcelRef {
 
 export type Piece =
   | { type: "morceau"; titre: string; artiste: string; album: string; colis?: ParcelRef | null }
-  | { type: "playlist"; nom: string; morceaux: { titre: string; artiste: string; album: string }[] };
+  | {
+      type: "playlist";
+      nom: string;
+      /** Les 300 premiers morceaux au plus (lus par toutes les versions). */
+      morceaux: { titre: string; artiste: string; album: string }[];
+      /** Au-delà de 300 (#10) : nombre total, et liste complète dans un colis chiffré. */
+      total?: number;
+      colis?: ParcelRef | null;
+    };
 
 /** Mot reçu d'un proche (messagerie). */
 export interface Word {
