@@ -1192,7 +1192,7 @@ fn report(app: &AppHandle, id: &str) -> impl FnMut(&'static str, u64, u64) + Sen
 }
 
 /// Avancement d'une partie d'un envoi par cycles : « Partie 2 sur 5 » accompagne chaque étape.
-fn report_part(app: &AppHandle, id: &str, part: usize, parts: usize) -> impl FnMut(&'static str, u64, u64) + Send + 'static {
+fn report_part(app: &AppHandle, id: &str, part: usize, parts: usize, tracks: (usize, usize)) -> impl FnMut(&'static str, u64, u64) + Send + 'static {
     let app = app.clone();
     let id = id.to_string();
     move |stage, done, total| {
@@ -1200,8 +1200,29 @@ fn report_part(app: &AppHandle, id: &str, part: usize, parts: usize) -> impl FnM
         if stage != "reprise" {
             p.message = Some(format!("Partie {} sur {parts}", part + 1));
         }
+        // Avancement de tout l'envoi (#11) : « morceaux 80 sur 1 160 », partie en cours.
+        p.part = u32::try_from(part + 1).ok();
+        p.parts = u32::try_from(parts).ok();
+        p.tracks_done = Some(tracks.0 as u64);
+        p.tracks_total = (tracks.1 > 0).then_some(tracks.1 as u64);
         crate::transfer::emit(&app, p)
     }
+}
+
+/// Coupure pendant un envoi par cycles : temps laissé aux deux appareils pour se retrouver
+/// avant d'abandonner (écran éteint, appli en arrière-plan, changement de réseau). Avant, 10
+/// essais (environ 7 minutes), puis tout l'envoi s'arrêtait.
+const RESUME_WINDOW: Duration = Duration::from_secs(30 * 60);
+
+/// Message de reprise montré pendant l'attente, des deux côtés.
+fn resume_report(app: &AppHandle, id: &str, part: usize, parts: usize, tracks: (usize, usize), waiting_for: &str) {
+    let mut p = crate::transfer::Progress::new(id, "reprise", 0, 0);
+    p.message = Some(format!("Partie {} sur {parts} : connexion coupée, en attente {waiting_for} (30 minutes au plus)…", part + 1));
+    p.part = u32::try_from(part + 1).ok();
+    p.parts = u32::try_from(parts).ok();
+    p.tracks_done = Some(tracks.0 as u64);
+    p.tracks_total = (tracks.1 > 0).then_some(tracks.1 as u64);
+    crate::transfer::emit(app, p);
 }
 
 fn finish_report(app: &AppHandle, id: &str, result: &Result<(), String>) {
@@ -1340,11 +1361,31 @@ fn remote_send_parts(
                     part: i,
                     parts: count,
                 };
-                let link = match first.take() {
-                    Some(p) => Ok(p),
-                    None => crate::remote::rejoin_send(&relay, &code, &cancel),
+                let done_tracks: usize = parts[..i].iter().map(Vec::len).sum();
+                // Coupure : la même partie est proposée de nouveau (même code) tant que le
+                // destinataire peut revenir ; il reprend là où il s'est arrêté (#11).
+                let mut cut_since: Option<std::time::Instant> = None;
+                let sent = loop {
+                    let link = match first.take() {
+                        Some(p) => Ok(p),
+                        None => crate::remote::rejoin_send(&relay, &code, &cancel),
+                    };
+                    let sent = link.and_then(|p| p.finish(&relay, &path, &offer, &cancel, report_part(&app, &transfer_id, i, count, (done_tracks, tracks))));
+                    match sent {
+                        Ok(()) => break Ok(()),
+                        // Première partie : le destinataire n'a encore rien reçu, rien à reprendre
+                        // (attente et nouveaux essais habituels de l'envoi).
+                        Err(e) if i == 0 || crate::transfer::cancelled(&cancel).is_err() || e.contains("refus") => break Err(e),
+                        Err(e) => {
+                            let since = *cut_since.get_or_insert_with(std::time::Instant::now);
+                            if since.elapsed() >= RESUME_WINDOW {
+                                break Err(e);
+                            }
+                            resume_report(&app, &transfer_id, i, count, (done_tracks, tracks), "du destinataire");
+                            crate::transfer::pause(Duration::from_secs(5), &cancel)?;
+                        }
+                    }
                 };
-                let sent = link.and_then(|p| p.finish(&relay, &path, &offer, &cancel, report_part(&app, &transfer_id, i, count)));
                 let _ = std::fs::remove_file(&path);
                 sent.map_err(|e| if i > 0 { format!("Partie {} sur {count} non envoyée : {e}", i + 1) } else { e })?;
                 if i + 1 < count {
@@ -1378,8 +1419,9 @@ pub fn remote_receive(
 }
 
 /// Réception d'un envoi, en une fois ou par cycles : chaque partie est importée dès son
-/// arrivée dans la même playlist. Si une partie manque, ce qui est arrivé reste dans la
-/// bibliothèque et la playlist, et le message le dit.
+/// arrivée dans la même playlist. Coupure : la partie est reprise automatiquement pendant 30
+/// minutes ; au-delà, saisir de nouveau le même code reprend à la partie manquante (tant que
+/// l'expéditeur la propose encore), sans recommencer ce qui est arrivé.
 fn receive_all(
     app: &AppHandle,
     relay: &str,
@@ -1388,36 +1430,75 @@ fn receive_all(
     cancel: &std::sync::atomic::AtomicBool,
     transfer_id: &str,
 ) -> Result<ImportResult, String> {
-    let first = crate::remote::receive(relay, code, dest, cancel, report(app, transfer_id))?;
-    let parts = first.parts;
-    let mut total = crate::transfer::import_received_into(app, dest, None, parts <= 1)?;
-    if parts <= 1 {
-        return Ok(total);
-    }
+    let resume_file = share_temp_dir(app).map(|d| d.join(RESUME_FILE));
+    let resumed = resume_file.as_deref().and_then(|f| PartsResume::load(f, code));
+    let (mut total, parts, start, tracks_total) = match resumed {
+        Some(r) => (r.total, r.parts, r.next, r.tracks_total),
+        None => {
+            let first = crate::remote::receive(relay, code, dest, cancel, report(app, transfer_id))?;
+            let parts = first.parts;
+            let total = crate::transfer::import_received_into(app, dest, None, parts <= 1)?;
+            if parts <= 1 {
+                return Ok(total);
+            }
+            (total, parts, 1, first.tracks)
+        }
+    };
     let into = total.playlist_id.clone();
     let mut missing = None;
-    for k in 1..parts {
-        let received = crate::remote::receive_part(relay, code, dest, cancel, true, report_part(app, transfer_id, k, parts)).and_then(|offer| {
-            if offer.kind != "playlist" || offer.parts != parts || offer.part != k {
-                return Err("Envoi inattendu de l'expéditeur.".into());
+    for k in start..parts {
+        let tracks = (total.track_ids.len(), tracks_total);
+        let mut cut_since: Option<std::time::Instant> = None;
+        let received = loop {
+            let got = crate::remote::receive_part(relay, code, dest, cancel, true, report_part(app, transfer_id, k, parts, tracks)).and_then(|offer| {
+                if offer.kind != "playlist" || offer.parts != parts || offer.part != k {
+                    return Err(UNEXPECTED.into());
+                }
+                Ok(())
+            });
+            match got {
+                Ok(()) => break Ok(()),
+                Err(e) if e == UNEXPECTED || crate::transfer::cancelled(cancel).is_err() => break Err(e),
+                Err(e) => {
+                    let since = *cut_since.get_or_insert_with(std::time::Instant::now);
+                    if since.elapsed() >= RESUME_WINDOW {
+                        break Err(e);
+                    }
+                    resume_report(app, transfer_id, k, parts, tracks, "de l'expéditeur");
+                    crate::transfer::pause(Duration::from_secs(5), cancel)?;
+                }
             }
-            crate::transfer::import_received_into(app, dest, into.as_deref(), false)
-        });
-        match received {
+        };
+        let imported = received.and_then(|()| crate::transfer::import_received_part(app, dest, into.as_deref(), false, &total.track_ids));
+        match imported {
             Ok(part) => {
                 total.added_tracks += part.added_tracks;
                 total.skipped_tracks += part.skipped_tracks;
+                total.merged_tracks += part.merged_tracks;
+                total.duplicate_tracks += part.duplicate_tracks;
                 total.track_ids.extend(part.track_ids);
+                if let Some(f) = resume_file.as_deref() {
+                    PartsResume::save(f, code, (parts, k + 1, tracks_total), &total);
+                }
             }
             Err(e) => {
                 missing = Some(format!(
-                    "Partie {} sur {parts} non reçue ({e}). Les {} morceaux déjà reçus sont dans la playlist « {} ».",
+                    "Partie {} sur {parts} non reçue ({e}). Les {} morceaux déjà reçus sont dans la playlist « {} ». Saisissez de nouveau le même code pour reprendre à la partie {}, tant que l'envoi est ouvert chez l'expéditeur.",
                     k + 1,
                     total.track_ids.len(),
-                    total.name
+                    total.name,
+                    k + 1
                 ));
+                if let Some(f) = resume_file.as_deref() {
+                    PartsResume::save(f, code, (parts, k, tracks_total), &total);
+                }
                 break;
             }
+        }
+    }
+    if missing.is_none() {
+        if let Some(f) = resume_file.as_deref() {
+            let _ = std::fs::remove_file(f);
         }
     }
     // Annoncée une seule fois, complète ou non : la playlist apparaît avec ce qui est arrivé.
@@ -1426,6 +1507,91 @@ fn receive_all(
         Some(message) => Err(message),
         None => Ok(total),
     }
+}
+
+const UNEXPECTED: &str = "Envoi inattendu de l'expéditeur.";
+/// Où en est une réception par cycles interrompue (dossier temporaire du partage).
+const RESUME_FILE: &str = "reprise.json";
+/// Une reprise n'a plus de sens au-delà de la durée maximale d'une salle du relais.
+const RESUME_MAX_AGE: Duration = Duration::from_secs(12 * 60 * 60);
+
+/// Réception par cycles interrompue : reprise à la partie `next` avec le même code. Le code
+/// lui-même n'est pas enregistré, seulement son empreinte (pour reconnaître le même envoi).
+#[derive(Serialize, serde::Deserialize)]
+struct PartsResume {
+    code: String,
+    parts: usize,
+    next: usize,
+    /// Morceaux de tout l'envoi (annoncés par l'expéditeur), pour l'avancement.
+    tracks: usize,
+    at: u64,
+    name: String,
+    playlist_id: Option<String>,
+    added: usize,
+    skipped: usize,
+    merged: usize,
+    duplicates: usize,
+    track_ids: Vec<String>,
+}
+
+impl PartsResume {
+    fn fingerprint(code: &crate::remote::Code) -> String {
+        use sha2::Digest;
+        let digest = sha2::Sha256::digest(format!("music-player/reprise/{}", code.text()).as_bytes());
+        digest.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    fn now() -> u64 {
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+    }
+
+    fn save(file: &Path, code: &crate::remote::Code, (parts, next, tracks): (usize, usize, usize), total: &ImportResult) {
+        let state = PartsResume {
+            code: Self::fingerprint(code),
+            parts,
+            next,
+            tracks,
+            at: Self::now(),
+            name: total.name.clone(),
+            playlist_id: total.playlist_id.clone(),
+            added: total.added_tracks,
+            skipped: total.skipped_tracks,
+            merged: total.merged_tracks,
+            duplicates: total.duplicate_tracks,
+            track_ids: total.track_ids.clone(),
+        };
+        if let Ok(text) = serde_json::to_string(&state) {
+            let _ = std::fs::write(file, text);
+        }
+    }
+
+    /// (totaux déjà reçus, nombre de parties, prochaine partie) pour ce code, s'il y a lieu.
+    fn load(file: &Path, code: &crate::remote::Code) -> Option<ResumePoint> {
+        let state: PartsResume = serde_json::from_str(&std::fs::read_to_string(file).ok()?).ok()?;
+        let fresh = Self::now().saturating_sub(state.at) < RESUME_MAX_AGE.as_secs();
+        (state.code == Self::fingerprint(code) && fresh && state.next > 0 && state.next < state.parts).then(|| ResumePoint {
+            parts: state.parts,
+            next: state.next,
+            tracks_total: state.tracks,
+            total: ImportResult {
+                name: state.name,
+                kind: "playlist".into(),
+                added_tracks: state.added,
+                skipped_tracks: state.skipped,
+                playlist_id: state.playlist_id,
+                track_ids: state.track_ids,
+                merged_tracks: state.merged,
+                duplicate_tracks: state.duplicates,
+            },
+        })
+    }
+}
+
+struct ResumePoint {
+    parts: usize,
+    next: usize,
+    tracks_total: usize,
+    total: ImportResult,
 }
 
 /// Morceaux reçus déplacés au démarrage (ancien identifiant, nouveau), une seule fois.
@@ -1583,4 +1749,56 @@ pub fn restore_state(state: &AppState, data_dir: &Path) -> Option<String> {
         queue.set_repeat(session.repeat);
     }
     session.library_root
+}
+
+#[cfg(test)]
+mod resume_tests {
+    use super::{ImportResult, PartsResume};
+    use crate::remote::Code;
+
+    fn received(n: usize) -> ImportResult {
+        ImportResult {
+            name: "Grosse".into(),
+            kind: "playlist".into(),
+            added_tracks: n,
+            skipped_tracks: 0,
+            playlist_id: Some("pl".into()),
+            track_ids: (0..n).map(|i| format!("t{i}")).collect(),
+            merged_tracks: 1,
+            duplicate_tracks: 2,
+        }
+    }
+
+    #[test]
+    fn a_cut_reception_resumes_at_the_missing_part_with_the_same_code() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("reprise.json");
+        let code = Code { room: "123456".into(), words: "lune-sable".into() };
+        // Coupure pendant la partie 3 sur 29 (parties 1 et 2 reçues : 80 morceaux).
+        PartsResume::save(&file, &code, (29, 2, 1160), &received(80));
+        let point = PartsResume::load(&file, &code).expect("reprise");
+        assert_eq!((point.parts, point.next, point.tracks_total), (29, 2, 1160));
+        assert_eq!(point.total.track_ids.len(), 80);
+        assert_eq!(point.total.playlist_id.as_deref(), Some("pl"));
+        assert_eq!((point.total.merged_tracks, point.total.duplicate_tracks), (1, 2));
+        // Le code n'est pas enregistré en clair.
+        let text = std::fs::read_to_string(&file).unwrap();
+        assert!(!text.contains("lune-sable") && !text.contains("123456"));
+        // Un autre code ne reprend rien.
+        assert!(PartsResume::load(&file, &Code { room: "123456".into(), words: "autre-mot".into() }).is_none());
+    }
+
+    #[test]
+    fn a_finished_or_stale_reception_is_not_resumed() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("reprise.json");
+        let code = Code { room: "123456".into(), words: "lune-sable".into() };
+        PartsResume::save(&file, &code, (3, 3, 100), &received(100));
+        assert!(PartsResume::load(&file, &code).is_none(), "toutes les parties reçues");
+        PartsResume::save(&file, &code, (3, 1, 100), &received(40));
+        let text = std::fs::read_to_string(&file).unwrap();
+        let stale = text.replacen("\"at\":", "\"at\":1,\"_\":", 1);
+        std::fs::write(&file, stale).unwrap();
+        assert!(PartsResume::load(&file, &code).is_none(), "trop ancienne");
+    }
 }
