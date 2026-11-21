@@ -209,7 +209,7 @@ async function submit() {
             <img v-if="r.thumbnail" class="thumb" :src="r.thumbnail" alt="" loading="lazy" referrerpolicy="no-referrer" />
             <span v-else class="thumb thumb-empty" aria-hidden="true"><Icon name="play" :size="16" /></span>
             <div class="result-text">
-              <strong class="result-title">{{ r.title }}</strong>
+              <strong class="result-title" :title="r.title">{{ r.title }}</strong>
               <span class="muted small">{{ r.artist || "Artiste inconnu" }}<template v-if="r.duration_secs"> · {{ formatDuration(r.duration_secs) }}</template></span>
             </div>
             <span v-if="sent.has(r.url)" class="added small"><Icon name="check" :size="14" /> Ajouté</span>
@@ -361,10 +361,19 @@ code {
   gap: 4px;
   color: var(--success);
 }
-/* Téléphone : bouton réduit à son icône pour laisser la place au titre. */
+/* Téléphone : bouton réduit à son icône pour laisser la place au titre, et titre sur deux
+   lignes au lieu d'être coupé court (les titres de vidéos sont longs). */
 @media (max-width: 480px) {
   .result-action {
     display: none;
+  }
+  .result-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 </style>
