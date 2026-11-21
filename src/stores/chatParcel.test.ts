@@ -92,3 +92,37 @@ describe("son envoyé dans la discussion", () => {
     expect(friends.error).toMatch(/mettre Music Player à jour/);
   });
 });
+
+describe("plusieurs sons envoyés d'un coup (#8)", () => {
+  async function linked() {
+    const friends = useFriendsStore();
+    friends.me = { ...A };
+    friends.enabled = true;
+    friends.friends = [{ code: B.code, name: "Biggy03", avatar: null, readToken: TOKEN, since: 0, pubKey: await publicKey(B.secret) }];
+    return friends;
+  }
+  const other: Track = { ...track, id: "t2", path: "/m/t2.mp3", title: "Θ. Macarena" };
+
+  it("part en un message par son, fichier compris ; le texte part avec le premier", async () => {
+    disk.archive = Uint8Array.from({ length: 4_000 }, (_, i) => i & 0xff);
+    const friends = await linked();
+    expect(await friends.sendTracks(B.code, [track, other], "deux sons")).toBe(2);
+    const lines = friends.conversations[B.code];
+    expect(lines.map((l) => [l.texte, l.piece?.type === "morceau" ? l.piece.titre : null])).toEqual([
+      ["deux sons", "Morose"],
+      ["", "Θ. Macarena"],
+    ]);
+    expect(lines.every((l) => l.piece?.type === "morceau" && !!l.piece.colis)).toBe(true);
+    expect(friends.batches).toEqual({});
+    expect(friends.error).toBeNull();
+  }, 30_000);
+
+  it("dit combien sont partis quand l'envoi s'arrête en route", async () => {
+    disk.archive = Uint8Array.from({ length: 4_000 }, (_, i) => i & 0xff);
+    const friends = await linked();
+    const sendTrack = vi.spyOn(friends, "sendTrack").mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    expect(await friends.sendTracks(B.code, [track, other, track], "")).toBe(1);
+    expect(sendTrack).toHaveBeenCalledTimes(2);
+    expect(friends.error).toMatch(/^1 son envoyé sur 3/);
+  });
+});
