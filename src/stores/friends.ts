@@ -26,6 +26,9 @@ import { useLibraryStore } from "./library";
 import { usePlayerStore } from "./player";
 import { useShareStore } from "./share";
 
+/** Sons envoyés d'un coup au plus (#8) : chacun est déposé sur le relais, gardé 7 jours. */
+export const MAX_TRACKS_AT_ONCE = 50;
+
 // Proches : on s'ajoute par code d'ami (ou depuis la liste des appareils du même Wi-Fi, ou
 // de sa ville sur option) ; l'ajout n'aboutit que si l'autre accepte. Chacun voit alors ce
 // que l'autre écoute, si l'autre a choisi de le partager. Tout passe par le relais du
@@ -170,6 +173,10 @@ export const useFriendsStore = defineStore("friends", {
     adoptingCard: false,
     /** Sons joints en cours d'envoi ou de réception. */
     parcels: {} as Record<string, ParcelProgress>,
+    /** Envoi de plusieurs sons en cours, par proche : combien sont partis sur combien. */
+    batches: {} as Record<string, { done: number; total: number }>,
+    /** Sons choisis ailleurs (barre de sélection) pour une discussion : joints à son ouverture. */
+    outbox: null as { code: string; trackIds: string[] } | null,
   }),
   getters: {
     base(): string | null {
@@ -607,6 +614,35 @@ export const useFriendsStore = defineStore("friends", {
       if (ok && piece.colis) useShareStore().noteShared([track.id], "envoye", { who: friend.name, via: "discussion" });
       if (ok && warning) this.error = warning;
       return ok;
+    },
+    /**
+     * Plusieurs sons d'un coup (#8) : un message par son, chacun exactement comme un envoi seul
+     * (fichier compris), donc lisible par toutes les versions installées. Le texte part avec le
+     * premier. S'arrête au premier message refusé ; renvoie combien sont partis.
+     */
+    async sendTracks(code: string, tracks: Track[], texte: string): Promise<number> {
+      const list = tracks.slice(0, MAX_TRACKS_AT_ONCE);
+      let sent = 0;
+      let lastWarning: string | null = null;
+      this.error = null;
+      this.batches = { ...this.batches, [code]: { done: 0, total: list.length } };
+      try {
+        for (const track of list) {
+          const ok = await this.sendTrack(code, track, sent === 0 ? texte : "");
+          // Un avertissement d'un son (fichier trop lourd…) ne doit pas être effacé par le suivant.
+          if (this.error) lastWarning = this.error;
+          if (!ok) break;
+          sent++;
+          this.batches = { ...this.batches, [code]: { done: sent, total: list.length } };
+        }
+      } finally {
+        const rest = { ...this.batches };
+        delete rest[code];
+        this.batches = rest;
+      }
+      if (sent < list.length) this.error = `${sent} son${sent > 1 ? "s" : ""} envoyé${sent > 1 ? "s" : ""} sur ${list.length}${lastWarning ? ` : ${lastWarning}` : "."}`;
+      else if (lastWarning) this.error = lastWarning;
+      return sent;
     },
     /** Reprend le fichier d'un son reçu dans la discussion ; renvoie le morceau importé. */
     async receivePiece(code: string, at: number): Promise<string | null> {

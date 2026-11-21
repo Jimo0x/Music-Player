@@ -5,7 +5,7 @@ import type { Track } from "@/lib/types";
 import { LibraryMatcher, matchPlaylist } from "@/lib/spotifyImport";
 import { formatBytes } from "@/lib/format";
 import { pace } from "@/lib/pace";
-import { type ChatLine, type ParcelProgress, useFriendsStore } from "@/stores/friends";
+import { type ChatLine, MAX_TRACKS_AT_ONCE, type ParcelProgress, useFriendsStore } from "@/stores/friends";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
 import { usePlaylistsStore } from "@/stores/playlists";
@@ -28,8 +28,11 @@ const lines = computed(() => (friend.value ? (friends.conversations[friend.value
 const live = computed(() => (friend.value ? (friends.live[friend.value.code]?.status ?? null) : null));
 const draft = ref("");
 const piece = ref<Piece | null>(null);
-/** Morceau joint : son fichier part avec le message. */
-const pieceTrack = ref<Track | null>(null);
+/** Morceaux joints (un ou plusieurs, #8) : leurs fichiers partent avec le message, un par un. */
+const pieceTracks = ref<Track[]>([]);
+/** Premier morceau joint (aperçu de la pièce jointe). */
+const pieceTrack = computed(() => pieceTracks.value[0] ?? null);
+const isPicked = (t: Track) => pieceTracks.value.some((p) => p.id === t.id);
 const sending = ref(false);
 const list = ref<HTMLElement | null>(null);
 const input = ref<HTMLTextAreaElement | null>(null);
@@ -108,10 +111,13 @@ const results = computed(() => {
   if (!q) return [];
   return library.tracks.filter((t) => norm(`${t.title} ${t.artist}`).includes(q)).slice(0, 40);
 });
+/** Coche ou décoche un morceau : on peut en joindre plusieurs, la fenêtre reste ouverte. */
 function attachTrack(t: Track) {
-  piece.value = { type: "morceau", titre: t.title, artiste: t.artist, album: t.album };
-  pieceTrack.value = t;
-  closeAttach();
+  if (isPicked(t)) pieceTracks.value = pieceTracks.value.filter((p) => p.id !== t.id);
+  else if (pieceTracks.value.length >= MAX_TRACKS_AT_ONCE) ui.notify(`${MAX_TRACKS_AT_ONCE} sons au plus par envoi.`);
+  else pieceTracks.value = [...pieceTracks.value, t];
+  const first = pieceTracks.value[0];
+  piece.value = first ? { type: "morceau", titre: first.title, artiste: first.artist, album: first.album } : null;
 }
 function attachPlaylist(id: string) {
   const p = playlists.byId(id);
@@ -123,7 +129,7 @@ function attachPlaylist(id: string) {
     .map((t) => ({ titre: t!.title, artiste: t!.artist, album: t!.album }));
   if (morceaux.length) {
     piece.value = { type: "playlist", nom: p.name, morceaux };
-    pieceTrack.value = null;
+    pieceTracks.value = [];
   }
   closeAttach();
 }
@@ -134,8 +140,23 @@ function closeAttach() {
 }
 function clearPiece() {
   piece.value = null;
-  pieceTrack.value = null;
+  pieceTracks.value = [];
 }
+/** Sons choisis dans la barre de sélection pour ce proche : joints dès l'ouverture. */
+watch(
+  () => [friends.outbox, friends.chatWith] as const,
+  ([outbox, chatWith]) => {
+    if (!outbox || outbox.code !== chatWith) return;
+    friends.outbox = null;
+    pieceTracks.value = outbox.trackIds
+      .map((id) => library.byId(id))
+      .filter((t): t is Track => !!t)
+      .slice(0, MAX_TRACKS_AT_ONCE);
+    const first = pieceTracks.value[0];
+    piece.value = first ? { type: "morceau", titre: first.title, artiste: first.artist, album: first.album } : null;
+  },
+  { immediate: true },
+);
 
 // ---- Saisie ----
 function grow() {
@@ -148,8 +169,13 @@ watch(draft, () => void nextTick(grow));
 async function send() {
   if (!friend.value || sending.value || (!draft.value.trim() && !piece.value)) return;
   sending.value = true;
-  const track = piece.value?.type === "morceau" ? pieceTrack.value : null;
-  const ok = track ? await friends.sendTrack(friend.value.code, track, draft.value) : await friends.sendWord(friend.value.code, draft.value, piece.value);
+  const tracks = piece.value?.type === "morceau" ? pieceTracks.value : [];
+  const ok =
+    tracks.length > 1
+      ? (await friends.sendTracks(friend.value.code, tracks, draft.value)) > 0
+      : tracks.length
+        ? await friends.sendTrack(friend.value.code, tracks[0], draft.value)
+        : await friends.sendWord(friend.value.code, draft.value, piece.value);
   sending.value = false;
   if (ok) {
     draft.value = "";
@@ -193,6 +219,8 @@ function sendingText(p: ParcelProgress): string {
 }
 const percent = (p: { done: number; total: number } | null) => (p && p.total ? Math.round((p.done / p.total) * 100) : 0);
 const outgoing = computed(() => (friend.value ? (friends.parcels[`out:${friend.value.code}`] ?? null) : null));
+/** Envoi de plusieurs sons : « Son 2 sur 5 » devant l'avancement du son en cours. */
+const batch = computed(() => (friend.value ? (friends.batches[friend.value.code] ?? null) : null));
 async function receive(l: ChatLine) {
   if (!friend.value) return;
   const id = await friends.receivePiece(friend.value.code, l.at);
@@ -314,15 +342,17 @@ const liveTrack = computed(() => (live.value ? matcher.value.find({ title: live.
               <strong>Joindre</strong>
               <button type="button" class="icon-btn" aria-label="Fermer" @click="attachOpen = false"><Icon name="close" :size="16" /></button>
             </div>
-            <button v-if="player.currentTrack" type="button" class="option" @click="attachTrack(player.currentTrack!)">
+            <button v-if="player.currentTrack" type="button" class="option" :class="{ picked: isPicked(player.currentTrack!) }" :aria-pressed="isPicked(player.currentTrack!)" @click="attachTrack(player.currentTrack!)">
               <span class="option-cover"><Artwork :track="player.currentTrack" :radius="6" eager /></span>
               <span class="option-text"><strong>Ce que j'écoute</strong><small>{{ player.currentTrack.title }} · {{ player.currentTrack.artist }}</small></span>
+              <Icon v-if="isPicked(player.currentTrack!)" class="tick" name="check" :size="16" />
             </button>
             <input v-model="query" class="fieldbox search" type="search" placeholder="Chercher un morceau à envoyer…" aria-label="Chercher un morceau à envoyer" />
             <div v-if="results.length" class="results">
-              <button v-for="t in results" :key="t.id" type="button" class="option" @click="attachTrack(t)">
+              <button v-for="t in results" :key="t.id" type="button" class="option" :class="{ picked: isPicked(t) }" :aria-pressed="isPicked(t)" @click="attachTrack(t)">
                 <span class="option-cover"><Artwork :track="t" :radius="6" /></span>
                 <span class="option-text"><strong>{{ t.title }}</strong><small>{{ t.artist }}</small></span>
+                <Icon v-if="isPicked(t)" class="tick" name="check" :size="16" />
               </button>
             </div>
             <p v-else-if="query.trim()" class="muted none">Aucun morceau trouvé.</p>
@@ -332,6 +362,9 @@ const liveTrack = computed(() => (live.value ? matcher.value.find({ title: live.
                 <button v-for="p in playlists.items" :key="p.id" type="button" class="chip" @click="attachPlaylist(p.id)"><Icon name="playlist" :size="13" /> {{ p.name }}</button>
               </div>
             </template>
+            <button v-if="pieceTracks.length" type="button" class="pill pill-accent done" @click="closeAttach">
+              Joindre {{ pieceTracks.length }} son{{ pieceTracks.length > 1 ? "s" : "" }}
+            </button>
           </div>
 
           <div v-if="piece" class="attached">
@@ -340,13 +373,21 @@ const liveTrack = computed(() => (live.value ? matcher.value.find({ title: live.
               <Icon v-else name="playlist" :size="16" />
             </span>
             <span class="attached-text">
-              <strong>{{ piece.type === "morceau" ? piece.titre : piece.nom }}</strong>
-              <small>{{ piece.type === "morceau" ? (friend.pubKey ? "Le fichier part avec le message" : "Titre seulement (proche pas à jour)") : `${piece.morceaux.length} morceaux` }}</small>
+              <strong>{{ pieceTracks.length > 1 ? `${pieceTracks.length} sons` : piece.type === "morceau" ? piece.titre : piece.nom }}</strong>
+              <small>{{
+                piece.type !== "morceau"
+                  ? `${piece.morceaux.length} morceaux`
+                  : !friend.pubKey
+                    ? "Titre seulement (proche pas à jour)"
+                    : pieceTracks.length > 1
+                      ? `${pieceTrack?.title} et ${pieceTracks.length - 1} autre${pieceTracks.length > 2 ? "s" : ""} · un message par son`
+                      : "Le fichier part avec le message"
+              }}</small>
             </span>
             <button type="button" class="icon-btn" aria-label="Retirer la pièce jointe" @click="clearPiece"><Icon name="close" :size="15" /></button>
           </div>
           <div v-if="outgoing" class="sending" role="status">
-            <span>{{ sendingText(outgoing) }}</span>
+            <span><template v-if="batch">Son {{ Math.min(batch.done + 1, batch.total) }} sur {{ batch.total }} · </template>{{ sendingText(outgoing) }}</span>
             <span class="bar"><span :style="{ width: `${percent(outgoing)}%` }" /></span>
           </div>
 
@@ -791,6 +832,20 @@ footer {
   .option:hover {
     background: rgba(var(--fg-rgb), 0.07);
   }
+}
+/* Morceau coché pour l'envoi (plusieurs possibles). */
+.option.picked {
+  background: var(--accent-soft);
+}
+.option .tick {
+  flex: none;
+  margin-left: auto;
+  color: var(--accent);
+}
+.attach .done {
+  justify-self: end;
+  align-self: flex-end;
+  margin-top: 6px;
 }
 .option-cover {
   flex: none;
