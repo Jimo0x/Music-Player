@@ -94,6 +94,8 @@ describe("son envoyé dans la discussion", () => {
 });
 
 describe("plusieurs sons envoyés d'un coup (#8)", () => {
+  // Les discussions sont gardées sur l'appareil : repartir d'une discussion vide.
+  beforeEach(() => localStorage.clear());
   async function linked() {
     const friends = useFriendsStore();
     friends.me = { ...A };
