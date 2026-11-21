@@ -186,10 +186,69 @@ pub fn search_songs(text: &str) -> Result<Vec<SearchResult>, JobError> {
         let runner = resolve_runner(&cancel)?;
         search_candidates(&runner, &query, &cancel)?
     };
-    Ok(candidates
+    Ok(present_results(candidates))
+}
+
+/// Résultats montrés comme des morceaux (à la façon d'Audiomack) : « Artiste - Titre (Clip
+/// officiel) » devient titre et artiste, « Artiste - Topic » (son officiel de YouTube Music)
+/// devient l'artiste. Les sons officiels d'abord, les longues compilations à la fin ; sinon
+/// l'ordre de YouTube est gardé.
+fn present_results(candidates: Vec<Candidate>) -> Vec<SearchResult> {
+    let mut ranked: Vec<(u8, SearchResult)> = candidates
         .into_iter()
-        .map(|c| SearchResult { thumbnail: video_id(&c.url).map(|id| format!("https://i.ytimg.com/vi/{id}/mqdefault.jpg")), title: c.title, artist: c.artist, duration_secs: c.duration_secs, url: c.url })
-        .collect())
+        .map(|c| {
+            let thumbnail = video_id(&c.url).map(|id| format!("https://i.ytimg.com/vi/{id}/mqdefault.jpg"));
+            let (title, artist, rank) = present(&c.title, &c.artist, c.duration_secs);
+            (rank, SearchResult { title, artist, duration_secs: c.duration_secs, url: c.url, thumbnail })
+        })
+        .collect();
+    ranked.sort_by_key(|(rank, _)| *rank);
+    ranked.into_iter().map(|(_, r)| r).collect()
+}
+
+/// (titre, artiste, rang) d'une vidéo : 0 son officiel, 1 clip ou audio officiel, 2 autre,
+/// 3 compilation de plus de 20 minutes.
+fn present(video_title: &str, channel: &str, duration: Option<f64>) -> (String, String, u8) {
+    let topic = channel.strip_suffix(" - Topic");
+    let title = strip_noise(video_title);
+    let official = {
+        let lower = video_title.to_lowercase();
+        ["official", "officiel", "audio", "lyric", "paroles", "visualizer"].iter().any(|w| lower.contains(w))
+    };
+    let long = duration.is_some_and(|d| d > 20.0 * 60.0);
+    if let Some(artist) = topic {
+        return (title, artist.trim().to_owned(), if long { 3 } else { 0 });
+    }
+    // « Artiste - Titre » (tiret entouré d'espaces) : la chaîne n'est souvent qu'un label.
+    let split = [" - ", " – ", " — "].iter().find_map(|sep| title.split_once(sep));
+    let (title, artist) = match split {
+        Some((artist, rest)) if !artist.trim().is_empty() && !rest.trim().is_empty() => (rest.trim().to_owned(), artist.trim().to_owned()),
+        _ => (title.clone(), channel.trim().to_owned()),
+    };
+    let rank = if long { 3 } else if official { 1 } else { 2 };
+    (title, artist, rank)
+}
+
+/// Retire du titre les mentions entre parenthèses ou crochets qui ne sont pas le titre
+/// (« (Official Video) », « [Clip officiel] », « (Lyrics) »…). Garde « (feat. X) », « (Remix) ».
+fn strip_noise(title: &str) -> String {
+    const NOISE: [&str; 14] = ["official", "officiel", "officielle", "clip", "video", "vidéo", "audio", "lyric", "lyrics", "paroles", "visualizer", "hd", "4k", "music"];
+    let mut out = String::with_capacity(title.len());
+    let mut rest = title;
+    while let Some(start) = rest.find(['(', '[']) {
+        let close = if rest[start..].starts_with('(') { ')' } else { ']' };
+        let Some(len) = rest[start..].find(close) else { break };
+        let inside = rest[start + 1..start + len].to_lowercase();
+        let noise = inside.split(|c: char| !c.is_alphanumeric() && c != 'é').filter(|w| !w.is_empty()).all(|w| NOISE.contains(&w) || (w == "version" && inside.contains("official")));
+        out.push_str(&rest[..start]);
+        if !noise {
+            out.push_str(&rest[start..=start + len]);
+        }
+        rest = &rest[start + len + 1..];
+    }
+    out.push_str(rest);
+    let cleaned = out.split_whitespace().collect::<Vec<_>>().join(" ");
+    if cleaned.is_empty() { title.trim().to_owned() } else { cleaned }
 }
 
 /// `ytsearch15:<texte>` : espaces regroupés, 200 caractères au plus, jamais de « - » en tête
@@ -577,6 +636,28 @@ mod tests {
         assert!(super::search_query(" - ").is_err());
         assert!(super::search_query("").is_err());
         assert_eq!(super::search_query(&"a".repeat(500)).expect("recherche").len(), "ytsearch15:".len() + 200);
+    }
+
+    #[test]
+    fn presente_les_videos_comme_des_morceaux() {
+        // Son officiel (chaîne « - Topic ») : le titre tel quel, l'artiste sans « - Topic ».
+        assert_eq!(super::present("Blinding Lights", "The Weeknd - Topic", Some(200.0)), ("Blinding Lights".into(), "The Weeknd".into(), 0));
+        // Clip : « Artiste - Titre (Official Video) » → titre et artiste.
+        assert_eq!(super::present("The Weeknd - Blinding Lights (Official Video)", "TheWeekndVEVO", Some(263.0)), ("Blinding Lights".into(), "The Weeknd".into(), 1));
+        assert_eq!(super::present("Damso - Θ. Macarena [Clip Officiel]", "Damso", Some(190.0)), ("Θ. Macarena".into(), "Damso".into(), 1));
+        // Ce qui fait partie du titre reste.
+        assert_eq!(super::present("Bruxelles vie (feat. Damso) (Remix)", "Label", None).0, "Bruxelles vie (feat. Damso) (Remix)");
+        // Compilation d'une heure : à la fin.
+        assert_eq!(super::present("Damso - Best of (Mix)", "Fan", Some(3600.0)).2, 3);
+        // Rien à séparer : la chaîne est l'artiste.
+        assert_eq!(super::present("Macarena", "Damso", Some(190.0)), ("Macarena".into(), "Damso".into(), 2));
+    }
+
+    #[test]
+    fn range_les_sons_officiels_d_abord_sans_changer_le_reste() {
+        let c = |title: &str, artist: &str, d: f64| super::Candidate { title: title.into(), artist: artist.into(), duration_secs: Some(d), url: format!("https://www.youtube.com/watch?v={:0>11}", title.len()) };
+        let out = super::present_results(vec![c("Live à Paris", "Fan", 300.0), c("Mix 1h", "Fan", 4000.0), c("Macarena", "Damso - Topic", 190.0), c("Autre", "Fan", 200.0)]);
+        assert_eq!(out.iter().map(|r| r.title.as_str()).collect::<Vec<_>>(), ["Macarena", "Live à Paris", "Autre", "Mix 1h"]);
     }
 
     #[test]

@@ -10,6 +10,7 @@ import AlbumCard from "@/components/AlbumCard.vue";
 import ArtistAvatar from "@/components/ArtistAvatar.vue";
 import Artwork from "@/components/Artwork.vue";
 import FriendAvatar from "@/components/FriendAvatar.vue";
+import OnlineResults from "@/components/OnlineResults.vue";
 import Icon from "@/components/Icon.vue";
 import TrackRow from "@/components/TrackRow.vue";
 
@@ -21,7 +22,7 @@ const player = usePlayerStore();
 const ui = useUiStore();
 const friends = useFriendsStore();
 
-type Tab = "tout" | "morceaux" | "albums" | "artistes" | "proches";
+type Tab = "tout" | "morceaux" | "albums" | "artistes" | "proches" | "internet";
 const tab = ref<Tab>("tout");
 watch(
   () => props.query,
@@ -59,6 +60,8 @@ const TABS = computed(() =>
       { id: "albums", label: "Albums", n: albums.value.length },
       { id: "artistes", label: "Artistes", n: artists.value.length },
       { id: "proches", label: "Proches", n: people.value.length },
+      // Toujours là : un son absent de la bibliothèque se cherche et se télécharge d'ici.
+      { id: "internet", label: "Sur Internet", n: -1 },
     ] as { id: Tab; label: string; n: number }[]
   ).filter((t) => t.n !== 0),
 );
@@ -85,17 +88,20 @@ const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : 
   <div class="page">
     <h1 class="page-title">Résultats pour « {{ query }} »</h1>
 
-    <div v-if="!empty" class="tabs" role="tablist" aria-label="Filtrer les résultats">
+    <div class="tabs" role="tablist" aria-label="Filtrer les résultats">
       <button v-for="t in TABS" :key="t.id" type="button" role="tab" :aria-selected="tab === t.id" :class="{ on: tab === t.id }" @click="tab = t.id">
         {{ t.label }}<span v-if="t.n > 0" class="n">{{ t.n }}</span>
       </button>
     </div>
 
-    <div v-if="empty" class="empty">
+    <div v-if="empty && tab === 'tout'" class="empty">
       <Icon name="search" :size="34" />
-      <p><strong>Rien trouvé pour « {{ query }} »</strong></p>
-      <p class="muted">Vérifiez l'orthographe, ou cherchez un titre, un artiste ou un album plus court.</p>
+      <p><strong>Rien dans la bibliothèque pour « {{ query }} »</strong></p>
+      <p class="muted">Les résultats trouvés sur Internet sont ci-dessous : un geste les télécharge.</p>
     </div>
+
+    <!-- Bibliothèque vide pour cette recherche, ou onglet « Sur Internet » : la liste complète. -->
+    <OnlineResults v-if="tab === 'internet' || (tab === 'tout' && empty)" :query="query" class="block" />
 
     <!-- Meilleur résultat et premiers morceaux -->
     <div v-if="tab === 'tout' && best" class="top">
@@ -167,6 +173,9 @@ const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : 
         <TrackRow :track="track" :index="i + 4" striped @play="playTracks(track)" />
       </div>
     </section>
+
+    <!-- Avec des résultats dans la bibliothèque : les premiers trouvés sur Internet en plus. -->
+    <OnlineResults v-if="tab === 'tout' && !empty" :query="query" :limit="5" class="block" @more="tab = 'internet'" />
 
     <section v-if="show('proches') && people.length" class="block">
       <h2>Proches</h2>
