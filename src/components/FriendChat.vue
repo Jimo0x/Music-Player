@@ -6,7 +6,7 @@ import { LibraryMatcher, matchPlaylist } from "@/lib/spotifyImport";
 import { formatBytes } from "@/lib/format";
 import { pieceTrackCount, playlistIncomplete } from "@/lib/playlistParcel";
 import { pace } from "@/lib/pace";
-import { type ChatLine, MAX_TRACKS_AT_ONCE, type ParcelProgress, useFriendsStore } from "@/stores/friends";
+import { type ChatLine, MAX_PLAYLISTS_AT_ONCE, MAX_TRACKS_AT_ONCE, type ParcelProgress, useFriendsStore } from "@/stores/friends";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
 import { usePlaylistsStore } from "@/stores/playlists";
@@ -34,6 +34,8 @@ const pieceTracks = ref<Track[]>([]);
 /** Premier morceau joint (aperçu de la pièce jointe). */
 const pieceTrack = computed(() => pieceTracks.value[0] ?? null);
 const isPicked = (t: Track) => pieceTracks.value.some((p) => p.id === t.id);
+/** Playlists jointes (une ou plusieurs, #9) : une par message. */
+const pickedPlaylists = ref<string[]>([]);
 const sending = ref(false);
 const list = ref<HTMLElement | null>(null);
 const input = ref<HTMLTextAreaElement | null>(null);
@@ -117,22 +119,29 @@ function attachTrack(t: Track) {
   if (isPicked(t)) pieceTracks.value = pieceTracks.value.filter((p) => p.id !== t.id);
   else if (pieceTracks.value.length >= MAX_TRACKS_AT_ONCE) ui.notify(`${MAX_TRACKS_AT_ONCE} sons au plus par envoi.`);
   else pieceTracks.value = [...pieceTracks.value, t];
+  pickedPlaylists.value = [];
   const first = pieceTracks.value[0];
   piece.value = first ? { type: "morceau", titre: first.title, artiste: first.artist, album: first.album } : null;
 }
-function attachPlaylist(id: string) {
+/** Playlist décrite pour un message (null si aucun de ses morceaux n'est dans la bibliothèque). */
+function playlistPiece(id: string): Piece | null {
   const p = playlists.byId(id);
-  if (!p) return;
+  if (!p) return null;
   const morceaux = p.track_ids
     .map((tid) => library.byId(tid))
     .filter((t) => !!t)
     // Plus de limite à 300 (#10) : au-delà, la liste complète part dans un colis chiffré.
     .map((t) => ({ titre: t!.title, artiste: t!.artist, album: t!.album }));
-  if (morceaux.length) {
-    piece.value = { type: "playlist", nom: p.name, morceaux };
-    pieceTracks.value = [];
-  }
-  closeAttach();
+  return morceaux.length ? { type: "playlist", nom: p.name, morceaux } : null;
+}
+/** Coche ou décoche une playlist : on peut en joindre plusieurs (#9), la fenêtre reste ouverte. */
+function attachPlaylist(id: string) {
+  if (pickedPlaylists.value.includes(id)) pickedPlaylists.value = pickedPlaylists.value.filter((p) => p !== id);
+  else if (pickedPlaylists.value.length >= MAX_PLAYLISTS_AT_ONCE) ui.notify(`${MAX_PLAYLISTS_AT_ONCE} playlists au plus par envoi.`);
+  else if (!playlistPiece(id)) ui.notify("Cette playlist est vide.");
+  else pickedPlaylists.value = [...pickedPlaylists.value, id];
+  pieceTracks.value = [];
+  piece.value = pickedPlaylists.value.length ? playlistPiece(pickedPlaylists.value[0]) : null;
 }
 function closeAttach() {
   attachOpen.value = false;
@@ -142,6 +151,7 @@ function closeAttach() {
 function clearPiece() {
   piece.value = null;
   pieceTracks.value = [];
+  pickedPlaylists.value = [];
 }
 /** Sons choisis dans la barre de sélection pour ce proche : joints dès l'ouverture. */
 watch(
@@ -176,8 +186,10 @@ async function send() {
       ? (await friends.sendTracks(friend.value.code, tracks, draft.value)) > 0
       : tracks.length
         ? await friends.sendTrack(friend.value.code, tracks[0], draft.value)
-        : piece.value?.type === "playlist"
-          ? await friends.sendPlaylist(friend.value.code, draft.value, piece.value)
+        : pickedPlaylists.value.length > 1
+          ? (await friends.sendPlaylists(friend.value.code, pickedPlaylists.value.map(playlistPiece).filter((p): p is Piece => !!p), draft.value)) > 0
+          : piece.value?.type === "playlist"
+            ? await friends.sendPlaylist(friend.value.code, draft.value, piece.value)
           : await friends.sendWord(friend.value.code, draft.value, piece.value);
   sending.value = false;
   if (ok) {
@@ -369,11 +381,16 @@ const liveTrack = computed(() => (live.value ? matcher.value.find({ title: live.
             <template v-else-if="playlists.items.length">
               <span class="label">Une playlist</span>
               <div class="chips">
-                <button v-for="p in playlists.items" :key="p.id" type="button" class="chip" @click="attachPlaylist(p.id)"><Icon name="playlist" :size="13" /> {{ p.name }}</button>
+                <button v-for="p in playlists.items" :key="p.id" type="button" class="chip" :class="{ picked: pickedPlaylists.includes(p.id) }" :aria-pressed="pickedPlaylists.includes(p.id)" @click="attachPlaylist(p.id)">
+                  <Icon :name="pickedPlaylists.includes(p.id) ? 'check' : 'playlist'" :size="13" /> {{ p.name }}
+                </button>
               </div>
             </template>
             <button v-if="pieceTracks.length" type="button" class="pill pill-accent done" @click="closeAttach">
               Joindre {{ pieceTracks.length }} son{{ pieceTracks.length > 1 ? "s" : "" }}
+            </button>
+            <button v-else-if="pickedPlaylists.length" type="button" class="pill pill-accent done" @click="closeAttach">
+              Joindre {{ pickedPlaylists.length }} playlist{{ pickedPlaylists.length > 1 ? "s" : "" }}
             </button>
           </div>
 
@@ -383,10 +400,12 @@ const liveTrack = computed(() => (live.value ? matcher.value.find({ title: live.
               <Icon v-else name="playlist" :size="16" />
             </span>
             <span class="attached-text">
-              <strong>{{ pieceTracks.length > 1 ? `${pieceTracks.length} sons` : piece.type === "morceau" ? piece.titre : piece.nom }}</strong>
+              <strong>{{ pieceTracks.length > 1 ? `${pieceTracks.length} sons` : pickedPlaylists.length > 1 ? `${pickedPlaylists.length} playlists` : piece.type === "morceau" ? piece.titre : piece.nom }}</strong>
               <small>{{
                 piece.type !== "morceau"
-                  ? `${piece.morceaux.length} morceaux${piece.morceaux.length > 300 && !friend.pubKey ? " (300 premiers : proche pas à jour)" : ""}`
+                  ? pickedPlaylists.length > 1
+                    ? `${piece.nom} et ${pickedPlaylists.length - 1} autre${pickedPlaylists.length > 2 ? "s" : ""} · une par message`
+                    : `${piece.morceaux.length} morceaux${piece.morceaux.length > 300 && !friend.pubKey ? " (300 premiers : proche pas à jour)" : ""}`
                   : !friend.pubKey
                     ? "Titre seulement (proche pas à jour)"
                     : pieceTracks.length > 1
@@ -397,7 +416,7 @@ const liveTrack = computed(() => (live.value ? matcher.value.find({ title: live.
             <button type="button" class="icon-btn" aria-label="Retirer la pièce jointe" @click="clearPiece"><Icon name="close" :size="15" /></button>
           </div>
           <div v-if="outgoing" class="sending" role="status">
-            <span><template v-if="batch">Son {{ Math.min(batch.done + 1, batch.total) }} sur {{ batch.total }} · </template>{{ sendingText(outgoing) }}</span>
+            <span><template v-if="batch">{{ batch.kind === "son" ? "Son" : "Playlist" }} {{ Math.min(batch.done + 1, batch.total) }} sur {{ batch.total }} · </template>{{ sendingText(outgoing) }}</span>
             <span class="bar"><span :style="{ width: `${percent(outgoing)}%` }" /></span>
           </div>
 
@@ -844,7 +863,8 @@ footer {
   }
 }
 /* Morceau coché pour l'envoi (plusieurs possibles). */
-.option.picked {
+.option.picked,
+.chip.picked {
   background: var(--accent-soft);
 }
 .option .tick {
