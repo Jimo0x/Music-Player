@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.11.1",
+    "date": "2026-11-21",
+    "items": [
+      "Partage par code : une grosse playlist arrive complète. Deux morceaux différents aux mêmes titre et artiste, arrivés dans deux parties, ne sont plus confondus (103 envoyés donnaient 97 reçus).",
+      "Partage par code : une coupure de connexion n'arrête plus tout. L'envoi reprend tout seul pendant 30 minutes ; au-delà, saisir de nouveau le même code reprend à la partie manquante.",
+      "Partage par code : l'avancement montre tout l'envoi (partie, morceaux, Mo, temps restant) et un résumé s'affiche à l'arrivée (reçus, déjà présents, doublons)."
+    ]
+  },
+  {
     "version": "0.11.0",
     "date": "2026-11-21",
     "items": [
