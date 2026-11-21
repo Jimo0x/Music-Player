@@ -217,6 +217,29 @@ jobs:
           releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: false
           prerelease: false
+          # latest.json est écrit une seule fois, par « updater-json », après les 3 systèmes :
+          # modifié par les 3 en même temps, il échouait (macOS, 0.10.4 : « Not Found -
+          # get-a-release-asset ») ou restait incomplet.
+          includeUpdaterJson: false
+
+  # Mise à jour automatique : latest.json (9 plateformes) refait à partir des signatures jointes
+  # à la version, une fois que Windows, Linux et macOS ont tous publié.
+  updater-json:
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/app-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+      - name: latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/updater-json.mjs "${GITHUB_REF_NAME}"
 
   # APK Android (téléphones arm64 et armv7, Android 8 et plus). Construit sur un tag
   # « app-v* » (et joint à la release) ou à la demande depuis l'onglet Actions.
