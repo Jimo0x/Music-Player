@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import { api, onAlignEvents, onScanEvents, onShareEvents } from "@/lib/api";
+import { shareSummary } from "@/lib/shareSummary";
 import { installAndroidFiles, installAndroidMedia, installInsets } from "@/lib/androidMedia";
 import { nudgeClock, setClockRunning } from "@/lib/clock";
 import type { Track } from "@/lib/types";
@@ -206,12 +207,8 @@ function onKey(e: KeyboardEvent) {
 
 let unlisten: (() => void) | null = null;
 
-/** Résumé affiché après l'import d'une archive de partage. */
-function shareImportMessage(result: { name: string; kind: string; added_tracks: number; skipped_tracks: number }): string {
-  const what = result.kind === "playlist" ? `la playlist « ${result.name} »` : `« ${result.name} »`;
-  const base = `${what} importée (${result.added_tracks} morceau${result.added_tracks > 1 ? "x" : ""})`;
-  return result.skipped_tracks > 0 ? `${base}, ${result.skipped_tracks} piste(s) illisible(s) ignorée(s).` : `${base}.`;
-}
+/** Résumé affiché après l'import d'une archive de partage (reçus, déjà là, doublons). */
+const shareImportMessage = shareSummary;
 
 // Fichier ouvert depuis une autre appli : une archive de partage (.mpshare) est importée,
 // un fichier audio est lu tout de suite (écran « À l'écoute » affiché).

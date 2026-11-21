@@ -53,6 +53,11 @@ pub struct ImportResult {
     pub playlist_id: Option<String>,
     /// Morceaux de l'archive dans la bibliothèque de cet appareil (« Reçus récemment »).
     pub track_ids: Vec<String>,
+    /// Déjà dans la bibliothèque (mêmes titre, artiste, album, durée à 2 s) : fusionnés avec
+    /// le morceau présent au lieu d'être copiés une seconde fois (#11).
+    pub merged_tracks: usize,
+    /// Déjà dans la playlist (le même morceau deux fois) : ignorés (#11).
+    pub duplicate_tracks: usize,
 }
 
 /// Remplace les caractères interdits dans un nom de fichier par `_`, et tronque.
@@ -381,6 +386,15 @@ pub fn import_bundle(state: &AppState, source: &Path) -> Result<ImportResult, St
 /// Comme `import_bundle`, mais une playlist reçue en plusieurs parties (envoi par cycles)
 /// complète la playlist déjà créée par la première partie (`into`) au lieu d'en créer une.
 pub fn import_bundle_into(state: &AppState, source: &Path, into: Option<&str>) -> Result<ImportResult, String> {
+    import_bundle_part(state, source, into, &[])
+}
+
+/// Comme `import_bundle_into`, pour une partie d'un envoi par cycles : `fresh` liste les
+/// morceaux importés par les parties précédentes du même envoi. Ils ne servent jamais de
+/// « morceau déjà là » : deux morceaux distincts aux mêmes étiquettes, répartis dans deux
+/// parties, arrivent tous les deux (avant, le second était fusionné avec le premier et la
+/// playlist perdait un morceau : 103 envoyés, 97 reçus).
+pub fn import_bundle_part(state: &AppState, source: &Path, into: Option<&str>, fresh: &[String]) -> Result<ImportResult, String> {
     let file = fs::File::open(source).map_err(|e| e.to_string())?;
     let mut archive = zip::ZipArchive::new(file)
         .map_err(|_| "Ce fichier n'est pas une archive de partage valide.".to_string())?;
@@ -404,12 +418,14 @@ pub fn import_bundle_into(state: &AppState, source: &Path, into: Option<&str>) -
 
     let mut imported_ids = Vec::new();
     let mut skipped = 0usize;
+    let mut merged = 0usize;
     // Morceaux déjà là avant cet import : deux fichiers distincts de l'archive aux mêmes
     // étiquettes (fréquent) ne sont jamais fusionnés entre eux.
     let before: Vec<(String, String, String, f64, String)> = state
         .library
         .locked()
         .iter()
+        .filter(|t| !fresh.contains(&t.id))
         .map(|t| (t.title.clone(), t.artist.clone(), t.album.clone(), t.duration_secs, t.id.clone()))
         .collect();
     for entry in &manifest.tracks {
@@ -427,6 +443,7 @@ pub fn import_bundle_into(state: &AppState, source: &Path, into: Option<&str>) -
             .map(|(.., id)| id.clone());
         if let Some(id) = existing_id {
             imported_ids.push(id);
+            merged += 1;
             continue;
         }
 
@@ -492,11 +509,14 @@ pub fn import_bundle_into(state: &AppState, source: &Path, into: Option<&str>) -
         let _ = library::save_cache(&state.library_cache_path(), &root, &tracks);
     }
 
+    let mut duplicates = 0usize;
     let playlist_id = if manifest.kind == "playlist" {
         let mut store = state.playlists.locked();
         let existing = into.filter(|id| store.get(id).is_some()).map(str::to_string);
         let id = existing.unwrap_or_else(|| store.create(manifest.name.clone(), manifest.theme.clone()));
-        let _ = store.add_tracks(&id, imported_ids.clone());
+        // Une playlist ne garde un morceau qu'une fois : ce qui n'y entre pas est un doublon.
+        let added = store.add_tracks(&id, imported_ids.clone()).unwrap_or(imported_ids.len());
+        duplicates = imported_ids.len() - added.min(imported_ids.len());
         let _ = store.save(&state.playlists_path());
         Some(id)
     } else {
@@ -510,6 +530,8 @@ pub fn import_bundle_into(state: &AppState, source: &Path, into: Option<&str>) -
         skipped_tracks: skipped,
         playlist_id,
         track_ids: imported_ids,
+        merged_tracks: merged,
+        duplicate_tracks: duplicates,
     })
 }
 
@@ -679,6 +701,46 @@ mod tests {
         let store = other.playlists.locked();
         assert_eq!(store.playlists.len(), 1, "une seule playlist");
         assert_eq!(store.get(&id).unwrap().track_ids.len(), 2);
+    }
+
+    #[test]
+    fn same_tags_in_two_parts_both_arrive() {
+        // Playlist avec deux morceaux distincts aux mêmes étiquettes, tombés dans deux parties.
+        let source_dir = tempfile::tempdir().unwrap();
+        let t1 = track_at(write_audio(source_dir.path(), "un.mp3"), "Même", "Artiste");
+        let t2 = track_at(write_audio(source_dir.path(), "un-bis.mp3"), "Même", "Artiste");
+        let bundles = tempfile::tempdir().unwrap();
+        let (a, b) = (bundles.path().join("1.mpshare"), bundles.path().join("2.mpshare"));
+        super::export_playlist_part(&a, "Doublons", None, std::slice::from_ref(&t1)).unwrap();
+        super::export_playlist_part(&b, "Doublons", None, std::slice::from_ref(&t2)).unwrap();
+        let other_dir = tempfile::tempdir().unwrap();
+        let other = make_state(other_dir.path());
+        let first = super::import_bundle_part(&other, &a, None, &[]).unwrap();
+        let id = first.playlist_id.clone().unwrap();
+        let second = super::import_bundle_part(&other, &b, Some(&id), &first.track_ids).unwrap();
+        assert_eq!((second.merged_tracks, second.duplicate_tracks), (0, 0));
+        assert_eq!(other.playlists.locked().get(&id).unwrap().track_ids.len(), 2, "les deux arrivent");
+
+        // Un morceau déjà là avant l'envoi reste fusionné, et compté comme tel.
+        let again = super::import_bundle_part(&other, &a, None, &[]).unwrap();
+        assert_eq!((again.added_tracks, again.merged_tracks), (1, 1));
+    }
+
+    #[test]
+    fn a_track_twice_in_the_playlist_is_counted_as_a_duplicate() {
+        let source_dir = tempfile::tempdir().unwrap();
+        let t1 = track_at(write_audio(source_dir.path(), "un.mp3"), "Un", "Artiste");
+        let bundles = tempfile::tempdir().unwrap();
+        let a = bundles.path().join("1.mpshare");
+        super::export_playlist_part(&a, "Liste", None, std::slice::from_ref(&t1)).unwrap();
+        let other_dir = tempfile::tempdir().unwrap();
+        let other = make_state(other_dir.path());
+        let first = super::import_bundle_part(&other, &a, None, &[]).unwrap();
+        let id = first.playlist_id.clone().unwrap();
+        // La même partie reçue de nouveau (reprise) dans la même playlist : rien en double.
+        let second = super::import_bundle_part(&other, &a, Some(&id), &[]).unwrap();
+        assert_eq!((second.merged_tracks, second.duplicate_tracks), (1, 1));
+        assert_eq!(other.playlists.locked().get(&id).unwrap().track_ids.len(), 1);
     }
 
     #[test]

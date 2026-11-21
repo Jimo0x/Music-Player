@@ -71,11 +71,21 @@ pub struct Progress {
     pub done: u64,
     pub total: u64,
     pub message: Option<String>,
+    /// Envoi par cycles (#11) : partie en cours (à partir de 1) et nombre de parties.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub part: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parts: Option<u32>,
+    /// Morceaux déjà passés (parties terminées) et morceaux de tout l'envoi.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tracks_done: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tracks_total: Option<u64>,
 }
 
 impl Progress {
     pub fn new(id: &str, stage: &'static str, done: u64, total: u64) -> Self {
-        Self { id: id.to_string(), stage, done, total, message: None }
+        Self { id: id.to_string(), stage, done, total, message: None, part: None, parts: None, tracks_done: None, tracks_total: None }
     }
 }
 
@@ -143,6 +153,12 @@ pub fn import_received(app: &AppHandle, path: &Path) -> Result<ImportResult, Str
 /// Comme `import_received` ; `into` : playlist à compléter (partie suivante d'un envoi par
 /// cycles), `announce` : prévenir l'interface (« share-received ») — seulement à la fin.
 pub fn import_received_into(app: &AppHandle, path: &Path, into: Option<&str>, announce: bool) -> Result<ImportResult, String> {
+    import_received_part(app, path, into, announce, &[])
+}
+
+/// Partie d'un envoi par cycles : `fresh` = morceaux importés par les parties précédentes
+/// (voir `sharing::import_bundle_part`).
+pub fn import_received_part(app: &AppHandle, path: &Path, into: Option<&str>, announce: bool, fresh: &[String]) -> Result<ImportResult, String> {
     let state = app.state::<AppState>();
     if is_backup(path) {
         let content = std::fs::read_to_string(path).map_err(|e| e.to_string());
@@ -155,9 +171,11 @@ pub fn import_received_into(app: &AppHandle, path: &Path, into: Option<&str>, an
             skipped_tracks: 0,
             playlist_id: None,
             track_ids: Vec::new(),
+            merged_tracks: 0,
+            duplicate_tracks: 0,
         });
     }
-    let result = sharing::import_bundle_into(&state, path, into);
+    let result = sharing::import_bundle_part(&state, path, into, fresh);
     let _ = std::fs::remove_file(path);
     let result = result?;
     let _ = app.emit("library-updated", &*state.library.locked());

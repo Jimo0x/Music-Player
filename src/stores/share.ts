@@ -250,7 +250,8 @@ export const useShareStore = defineStore("share", {
       const percent =
         p.total > 0 && (p.stage === "envoi" || p.stage === "reception") ? Math.round((p.done / p.total) * 100) : -1;
       taskbarProgress(percent);
-      const what = `${t.direction === "envoi" ? "Envoi" : "Réception"} de « ${t.label || "partage"} »`;
+      const part = p.part && p.parts ? ` · partie ${p.part} sur ${p.parts}` : "";
+      const what = `${t.direction === "envoi" ? "Envoi" : "Réception"} de « ${t.label || "partage"} »${part}`;
       const text = p.stage === "reprise" ? `${what} : reprise après une coupure…` : what;
       transferNotice(text, percent);
     },

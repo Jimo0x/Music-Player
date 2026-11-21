@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { formatBytes } from "@/lib/format";
 import { pace as paceText } from "@/lib/pace";
+import { shareSummary } from "@/lib/shareSummary";
 import { isRunning, useShareStore, type Transfer } from "@/stores/share";
 import Icon from "./Icon.vue";
 
@@ -15,16 +16,25 @@ const percent = computed(() =>
   moving.value && p.value.total > 0 ? Math.min(100, Math.round((p.value.done / p.value.total) * 100)) : null,
 );
 
-/** « ≈ 2 min · 1,2 Mo/s », d'après le débit mesuré (rien tant qu'il n'est pas fiable). */
+/** « ≈ 2 min · 1,2 Mo/s », d'après le débit mesuré (rien tant qu'il n'est pas fiable). Envoi
+ *  par cycles : temps restant pour tout l'envoi (les parties suivantes comptées comme celle-ci). */
 const pace = computed(() => {
-  const text = moving.value ? paceText(p.value.done, p.value.total, props.transfer.rate) : "";
-  return text ? ` · ${text}` : "";
+  const left = p.value.part && p.value.parts ? (p.value.parts - p.value.part) * p.value.total : 0;
+  const text = moving.value ? paceText(p.value.done, p.value.total + left, props.transfer.rate) : "";
+  return text ? ` · ${text}${left ? " pour tout l'envoi" : ""}` : "";
+});
+
+/** « 80 morceaux sur 1 160 » : parties déjà terminées (#11). */
+const tracks = computed(() => {
+  const { tracks_done: done, tracks_total: total } = p.value;
+  if (done === undefined) return "";
+  return total ? `${done} morceau${done > 1 ? "x" : ""} sur ${total} · ` : `${done} morceau${done > 1 ? "x" : ""} reçu${done > 1 ? "s" : ""} · `;
 });
 
 const status = computed(() => {
   const t = props.transfer;
   // Envoi par cycles (grosse playlist) : « Partie 2 sur 5 » devant l'étape en cours.
-  const part = p.value.message?.startsWith("Partie ") ? `${p.value.message} · ` : "";
+  const part = p.value.message?.startsWith("Partie ") ? `${p.value.message} · ${tracks.value}` : "";
   switch (p.value.stage) {
     case "attente":
       if (part) return `${part}${t.direction === "reception" ? "en attente de la suite…" : "préparation de la suite…"}`;
@@ -40,7 +50,8 @@ const status = computed(() => {
       if (p.value.message) return p.value.message;
       return `Connexion perdue : nouvel essai ${p.value.done} sur ${p.value.total}, le transfert reprendra où il s'est arrêté…`;
     case "fini":
-      return t.direction === "envoi" ? "Envoyé" : "Reçu et ajouté à la bibliothèque";
+      if (t.direction === "envoi") return "Envoyé";
+      return t.result ? shareSummary(t.result) : "Reçu et ajouté à la bibliothèque";
     case "refuse":
       return "Refusé";
     default:

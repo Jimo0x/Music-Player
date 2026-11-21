@@ -192,6 +192,12 @@ export interface TransferProgress {
   done: number;
   total: number;
   message: string | null;
+  /** Envoi par cycles (#11) : partie en cours (à partir de 1), nombre de parties, morceaux
+   *  des parties terminées et de tout l'envoi. Absents pour un envoi en une fois. */
+  part?: number;
+  parts?: number;
+  tracks_done?: number;
+  tracks_total?: number;
 }
 
 /** Doublons retirés, et fichiers que l'appli n'a pas pu effacer elle-même (chemins). */
@@ -208,6 +214,10 @@ export interface ShareImportResult {
   skipped_tracks: number;
   playlist_id: string | null;
   track_ids: string[];
+  /** Déjà dans la bibliothèque : fusionnés avec le morceau présent (#11). */
+  merged_tracks?: number;
+  /** Déjà dans la playlist : ignorés (#11). */
+  duplicate_tracks?: number;
 }
 
 /** Nouvelle version proposée par la mise à jour automatique (ordinateur). */
