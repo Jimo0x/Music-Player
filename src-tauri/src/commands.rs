@@ -1703,6 +1703,74 @@ pub fn get_eq_gains(state: State<AppState>) -> crate::eq::Gains {
 }
 
 // ---------------------------------------------------------------------
+// Mode immersif (rotation 8D, acoustique de salle)
+// ---------------------------------------------------------------------
+
+/// Applique au son les réglages qui valent maintenant (playlist en cours ou globaux).
+fn publish_immersive(state: &State<AppState>) -> crate::immersive::ImmersiveProfiles {
+    let profiles = state.immersive.locked().clone();
+    crate::immersive::publish(profiles.effective());
+    profiles
+}
+
+#[tauri::command]
+pub fn get_immersive(state: State<AppState>) -> crate::immersive::ImmersiveProfiles {
+    state.immersive.locked().clone()
+}
+
+/// Réglages globaux (ceux de toutes les écoutes hors playlist qui a sa propre ambiance).
+#[tauri::command]
+pub fn set_immersive(state: State<AppState>, settings: crate::immersive::ImmersiveSettings) -> crate::immersive::ImmersiveProfiles {
+    state.immersive.locked().global = settings.sanitized();
+    publish_immersive(&state)
+}
+
+/// Ambiance propre à une playlist ; `None` : la playlist suit les réglages globaux.
+#[tauri::command]
+pub fn set_playlist_immersive(
+    state: State<AppState>,
+    playlist_id: String,
+    settings: Option<crate::immersive::ImmersiveSettings>,
+) -> Result<crate::immersive::ImmersiveProfiles, String> {
+    if playlist_id.trim().is_empty() {
+        return Err("Playlist inconnue.".to_string());
+    }
+    {
+        let mut profiles = state.immersive.locked();
+        match settings {
+            Some(s) => {
+                profiles.playlists.insert(playlist_id, s.sanitized());
+            }
+            None => {
+                profiles.playlists.remove(&playlist_id);
+            }
+        }
+    }
+    let profiles = publish_immersive(&state);
+    let _ = persist_session(&state);
+    Ok(profiles)
+}
+
+/// Playlist d'où vient la lecture lancée (`None` : ailleurs que dans une playlist).
+#[tauri::command]
+pub fn set_immersive_context(state: State<AppState>, playlist_id: Option<String>) -> crate::immersive::ImmersiveProfiles {
+    state.immersive.locked().context = playlist_id.filter(|id| !id.trim().is_empty());
+    publish_immersive(&state)
+}
+
+/// « Comparer » maintenu : son sans effet, réglages gardés.
+#[tauri::command]
+pub fn set_immersive_bypass(on: bool) {
+    crate::immersive::set_bypass(on);
+}
+
+/// Mode léger de l'appli : réverbération allégée.
+#[tauri::command]
+pub fn set_immersive_lite(on: bool) {
+    crate::immersive::set_lite(on);
+}
+
+// ---------------------------------------------------------------------
 // Session (persistance entre lancements)
 // ---------------------------------------------------------------------
 
@@ -1782,6 +1850,7 @@ pub fn persist_session(state: &State<AppState>) -> std::io::Result<()> {
         repeat: queue.repeat(),
         eq_gains: *state.eq_gains.locked(),
         output_device: crate::audio::output_choice(),
+        immersive: state.immersive.locked().clone(),
     };
     session.save(&state.session_path())
 }
@@ -1801,6 +1870,8 @@ pub fn restore_state(state: &AppState, data_dir: &Path) -> Option<String> {
     let session = SessionState::load(&PathBuf::from(data_dir).join("session.json"));
     *state.volume.locked() = session.volume;
     *state.eq_gains.locked() = session.eq_gains;
+    crate::immersive::publish(session.immersive.effective());
+    *state.immersive.locked() = session.immersive.clone();
     crate::audio::set_output_choice(session.output_device.clone(), session.output_device.is_some());
 
     if let Some(root) = &session.library_root {

@@ -50,7 +50,7 @@ const active = ref<SectionId>("mentions");
           <h3>Hébergement</h3>
           <p>Application installée et exécutée sur votre appareil. Le relais qui sert au partage à distance, aux Proches, à la synchronisation et aux avis est hébergé par Cloudflare, Inc. (San Francisco, États-Unis). Le code source est publié sur GitHub (GitHub, Inc., San Francisco, États-Unis).</p>
           <h3>Propriété intellectuelle</h3>
-          <p>Le code source est distribué sous licence MIT.</p>
+          <p>Le code source est distribué sous licence MIT. Le mode immersif (« Tête mesurée ») utilise les mesures de la base SADIE II, AudioLab de l'Université d'York, sous licence Apache 2.0.</p>
         </div>
 
         <div v-else-if="active === 'confidentialite'" class="section">

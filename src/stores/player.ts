@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { api } from "@/lib/api";
+import { useImmersiveStore } from "@/stores/immersive";
 import type { PlaybackStatus, QueueView, RepeatMode, Track } from "@/lib/types";
 
 // Sondage du moteur audio : une fois par seconde en lecture (la position affichée est
@@ -99,18 +100,21 @@ export const usePlayerStore = defineStore("player", {
         this.busy = false;
       }
     },
-    playQueue(trackIds: string[], startId?: string | null) {
+    /** `fromPlaylist` : identifiant de la playlist d'où part la lecture (son ambiance immersive s'applique). */
+    playQueue(trackIds: string[], startId?: string | null, fromPlaylist: string | null = null) {
+      void useImmersiveStore().setContext(fromPlaylist);
       return this.run(() => api.playQueue(trackIds, startId ?? null));
     },
-    playShuffled(trackIds: string[]) {
+    playShuffled(trackIds: string[], fromPlaylist: string | null = null) {
       const shuffled = [...trackIds];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
-      return this.playQueue(shuffled, shuffled[0]);
+      return this.playQueue(shuffled, shuffled[0], fromPlaylist);
     },
     playTrackNow(trackId: string) {
+      void useImmersiveStore().setContext(null);
       return this.run(() => api.playTrackNow(trackId));
     },
     next() {

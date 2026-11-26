@@ -11,6 +11,8 @@ import { SCROLLER } from "@/lib/virtual";
 import { useAmbienceStore } from "@/stores/ambience";
 import { useAppearanceStore } from "@/stores/appearance";
 import { useEqStore } from "@/stores/eq";
+import { useImmersiveStore } from "@/stores/immersive";
+import { lite } from "@/lib/perf";
 import { useFavoritesStore } from "@/stores/favorites";
 import { useLibraryStore } from "@/stores/library";
 import { useLyricsStore } from "@/stores/lyrics";
@@ -78,6 +80,9 @@ const friends = useFriendsStore();
 const sync = useSyncStore();
 const share = useShareStore();
 const eq = useEqStore();
+const immersive = useImmersiveStore();
+// Mode léger : réverbération allégée (moitié moins de filtres).
+watch(lite, (on) => void api.setImmersiveLite(on).catch(() => undefined), { immediate: true });
 const appearance = useAppearanceStore();
 const ui = useUiStore();
 const baladeur = useBaladeurStore();
@@ -342,6 +347,7 @@ onMounted(async () => {
   playlists.setFromInitialState(initial.playlists);
   favorites.setFromInitialState(initial.favorites);
   eq.setFromInitialState(initial.eq_gains);
+  void immersive.load();
   player.setFromInitialState({
     current_track: initial.current_track,
     position_secs: initial.position_secs,

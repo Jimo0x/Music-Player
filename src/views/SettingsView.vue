@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { openDefaultApps } from "@/lib/androidMedia";
 import { formatCollection } from "@/lib/format";
 import Equalizer from "@/components/Equalizer.vue";
+import Immersive from "@/components/Immersive.vue";
 import OutputDevices from "@/components/OutputDevices.vue";
 import { useLibraryStore } from "@/stores/library";
 import { useLyricsStore } from "@/stores/lyrics";
@@ -305,6 +306,11 @@ const shortcuts = [
     <section class="section-card">
       <h2><Icon name="eq" :size="17" /> Égaliseur</h2>
       <Equalizer />
+    </section>
+
+    <section id="mode-immersif" class="section-card">
+      <h2><Icon name="orbit" :size="17" /> Mode immersif</h2>
+      <Immersive />
     </section>
 
     <section class="section-card">

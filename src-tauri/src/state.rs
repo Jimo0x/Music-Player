@@ -33,6 +33,8 @@ pub struct AppState {
     pub playlists: Mutex<PlaylistStore>,
     pub favorites: Mutex<FavoritesStore>,
     pub eq_gains: EqGains,
+    /// Mode immersif : réglages globaux, par playlist, et playlist de la lecture en cours.
+    pub immersive: Mutex<crate::immersive::ImmersiveProfiles>,
     pub volume: Mutex<f32>,
     /// Position (s) où reprendre le morceau en cours quand aucun n'est encore chargé dans le
     /// moteur : celle de la dernière session au démarrage, ou un saut demandé avant lecture.
@@ -62,6 +64,7 @@ impl AppState {
             playlists: Mutex::new(PlaylistStore::default()),
             favorites: Mutex::new(FavoritesStore::default()),
             eq_gains,
+            immersive: Mutex::new(crate::immersive::ImmersiveProfiles::default()),
             volume: Mutex::new(1.0),
             resume_at: Mutex::new(0.0),
             data_dir,

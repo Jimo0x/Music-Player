@@ -10,7 +10,7 @@
 // atterrir dans le bundle livré à l'utilisateur.
 
 import pkg from "../../package.json";
-import type { InitialState, Lyrics, Playlist, PlaybackStatus, QueueView, RepeatMode, ShareImportResult, Track } from "./types";
+import type { ImmersiveProfiles, ImmersiveSettings, InitialState, Lyrics, Playlist, PlaybackStatus, QueueView, RepeatMode, ShareImportResult, Track } from "./types";
 
 const DEMO_ALBUMS = [
   { album: "Nuit Blanche", artist: "Les Ondes", year: 2021, colors: ["#1b1f4a", "#6a3cff", "#ff4fa3"] },
@@ -126,6 +126,22 @@ export function installTauriMock() {
   let isPaused = true;
   let positionSecs = 0;
   let eqGains: number[] = Array(10).fill(0);
+  const immersiveDefaults = (): ImmersiveSettings => ({
+    enabled: false,
+    rotation: true,
+    engine: "head",
+    speed: 10,
+    clockwise: true,
+    intensity: 0.85,
+    room: false,
+    room_preset: "concert",
+    room_size: 0.72,
+    room_damping: 0.45,
+    room_mix: 0.3,
+    room_predelay_ms: 25,
+  });
+  const immersive: ImmersiveProfiles = { global: immersiveDefaults(), playlists: {}, context: null };
+  const immersiveCopy = (): ImmersiveProfiles => JSON.parse(JSON.stringify(immersive));
   let mockOutput: string | null = null;
   const dismissedLyrics = new Set<string>();
   const upgraded = new Set<string>();
@@ -453,6 +469,23 @@ export function installTauriMock() {
       eqGains = gains;
     },
     get_eq_gains: () => eqGains,
+
+    get_immersive: () => immersiveCopy(),
+    set_immersive: ({ settings }) => {
+      immersive.global = { ...settings };
+      return immersiveCopy();
+    },
+    set_playlist_immersive: ({ playlistId, settings }) => {
+      if (settings) immersive.playlists[playlistId] = { ...settings };
+      else delete immersive.playlists[playlistId];
+      return immersiveCopy();
+    },
+    set_immersive_context: ({ playlistId }) => {
+      immersive.context = playlistId ?? null;
+      return immersiveCopy();
+    },
+    set_immersive_bypass: () => undefined,
+    set_immersive_lite: () => undefined,
 
     toggle_favorite: ({ trackId }) => {
       const now = !favorites.has(trackId);

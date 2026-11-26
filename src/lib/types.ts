@@ -123,6 +123,33 @@ export interface ScanProgress {
   total: number;
 }
 
+/** Mode immersif (0.14.0) : rotation 8D et acoustique de salle. */
+export interface ImmersiveSettings {
+  enabled: boolean;
+  rotation: boolean;
+  /** « head » : tête simplifiée calculée ; « hrtf » : tête mesurée (SADIE II). */
+  engine: "head" | "hrtf";
+  /** Tours par minute (2 à 40). */
+  speed: number;
+  clockwise: boolean;
+  /** Dosage de l'effet 8D (0 à 1). */
+  intensity: number;
+  room: boolean;
+  room_preset: string;
+  room_size: number;
+  room_damping: number;
+  room_mix: number;
+  room_predelay_ms: number;
+}
+
+export interface ImmersiveProfiles {
+  global: ImmersiveSettings;
+  /** Ambiances propres à des playlists (identifiant → réglages). */
+  playlists: Record<string, ImmersiveSettings>;
+  /** Playlist d'où vient la lecture en cours. */
+  context: string | null;
+}
+
 export interface InitialState {
   library_root: string | null;
   library: Track[];

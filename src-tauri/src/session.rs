@@ -23,6 +23,9 @@ pub struct SessionState {
     /// Sortie audio choisie (nom du périphérique), `None` : celle du système.
     #[serde(default)]
     pub output_device: Option<String>,
+    /// Mode immersif (0.14.0) : réglages globaux et par playlist.
+    #[serde(default)]
+    pub immersive: crate::immersive::ImmersiveProfiles,
 }
 
 impl Default for SessionState {
@@ -37,6 +40,7 @@ impl Default for SessionState {
             repeat: RepeatMode::Off,
             eq_gains: [0.0; crate::eq::BANDS],
             output_device: None,
+            immersive: Default::default(),
         }
     }
 }
@@ -74,6 +78,7 @@ impl SessionState {
                 0.0
             };
         }
+        self.immersive = std::mem::take(&mut self.immersive).sanitized();
         self.queue.retain(|track| !track.trim().is_empty());
         if self
             .current_track_id
@@ -138,10 +143,16 @@ mod tests {
             repeat: RepeatMode::All,
             eq_gains: crate::eq::from_three([3.0, -2.0, 1.5]),
             output_device: Some("Casque (USB)".to_string()),
+            immersive: crate::immersive::ImmersiveProfiles {
+                global: crate::immersive::ImmersiveSettings { enabled: true, room: true, ..Default::default() },
+                playlists: [("p1".to_string(), crate::immersive::ImmersiveSettings { speed: 20.0, ..Default::default() })].into(),
+                context: Some("p1".to_string()),
+            },
         };
         state.save(&path).unwrap();
 
         let reloaded = SessionState::load(&path);
+        assert_eq!(reloaded.immersive, state.immersive);
         assert_eq!(reloaded.library_root, state.library_root);
         assert_eq!(reloaded.queue, state.queue);
         assert_eq!(reloaded.current_track_id, state.current_track_id);

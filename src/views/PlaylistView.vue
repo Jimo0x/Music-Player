@@ -9,6 +9,8 @@ import { useAppearanceStore } from "@/stores/appearance";
 import { useShareStore } from "@/stores/share";
 import { useUiStore } from "@/stores/ui";
 import Icon from "@/components/Icon.vue";
+import ImmersiveDialog from "@/components/ImmersiveDialog.vue";
+import { describeImmersive, useImmersiveStore } from "@/stores/immersive";
 import PlaylistCover from "@/components/PlaylistCover.vue";
 import TrackRow from "@/components/TrackRow.vue";
 import VirtualList from "@/components/VirtualList.vue";
@@ -21,6 +23,8 @@ const library = useLibraryStore();
 const player = usePlayerStore();
 const playlists = usePlaylistsStore();
 const ui = useUiStore();
+const immersive = useImmersiveStore();
+const showAmbience = ref(false);
 const appearance = useAppearanceStore();
 const shareStore = useShareStore();
 
@@ -110,8 +114,8 @@ function share() {
           </template>
         </p>
         <div class="actions">
-          <button type="button" class="pill pill-accent" :disabled="!ids.length" @click="player.playQueue(ids, ids[0])"><Icon name="play" :size="14" /> Lire</button>
-          <button type="button" class="pill pill-ghost" :disabled="!ids.length" @click="player.playShuffled(ids)"><Icon name="shuffle" :size="15" /> Aléatoire</button>
+          <button type="button" class="pill pill-accent" :disabled="!ids.length" @click="player.playQueue(ids, ids[0], playlist.id)"><Icon name="play" :size="14" /> Lire</button>
+          <button type="button" class="pill pill-ghost" :disabled="!ids.length" @click="player.playShuffled(ids, playlist.id)"><Icon name="shuffle" :size="15" /> Aléatoire</button>
           <button
             v-if="player.currentTrack"
             type="button"
@@ -127,6 +131,16 @@ function share() {
             <Icon name="check" :size="15" /> {{ ui.selecting ? "Terminer" : "Sélectionner" }}
           </button>
           <button type="button" class="icon-btn" title="Personnaliser (nom, jaquette)" aria-label="Personnaliser la playlist" @click="ui.playlistDialog = { mode: 'edit', id: playlist.id }"><Icon name="brush" :size="17" /></button>
+          <button
+            type="button"
+            class="icon-btn"
+            :class="{ on: immersive.hasOwn(playlist.id) }"
+            :title="immersive.hasOwn(playlist.id) ? `Ambiance de la playlist : ${describeImmersive(immersive.settingsFor(playlist.id))}` : 'Donner une ambiance à cette playlist (mode immersif)'"
+            aria-label="Ambiance de la playlist"
+            @click="showAmbience = true"
+          >
+            <Icon name="orbit" :size="17" />
+          </button>
           <button type="button" class="icon-btn" title="Partager cette playlist" aria-label="Partager cette playlist" :disabled="!ids.length" @click="share"><Icon name="share" :size="17" /></button>
           <button type="button" class="icon-btn" title="Supprimer la playlist" aria-label="Supprimer la playlist" @click="remove"><Icon name="trash" :size="17" /></button>
         </div>
@@ -150,9 +164,10 @@ function share() {
          téléphone, et le toucher semblait sans effet. -->
     <VirtualList v-else :items="tracks" :row-height="52">
       <template #default="{ item, index }">
-        <TrackRow :track="item" :index="index" variant="playlist" :playlist-id="playlist.id" striped @play="player.playQueue(ids, item.id)" />
+        <TrackRow :track="item" :index="index" variant="playlist" :playlist-id="playlist.id" striped @play="player.playQueue(ids, item.id, playlist.id)" />
       </template>
     </VirtualList>
+    <ImmersiveDialog v-if="showAmbience" :playlist-id="playlist.id" @close="showAmbience = false" />
   </div>
 </template>
 

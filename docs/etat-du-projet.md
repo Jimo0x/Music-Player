@@ -1,12 +1,35 @@
 # État du projet
 
-Mis à jour le **26 novembre 2026** : **0.13.0** publiée, rien en cours. À tenir à jour à
+Mis à jour le **26 novembre 2026** : **0.13.0** publiée ; lot **0.14.0 Mode immersif** codé, non publié. À tenir à jour à
 chaque version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
 
 ## En cours : à reprendre en premier
 
-Rien en cours, aucune demande de fusion ouverte, aucun ticket ouvert. Prochain chantier voulu
-par le propriétaire : le lot **0.14.0 Mode immersif** (voir « À faire ensuite »).
+**Lot 0.14.0 Mode immersif** : codé sur `main` (commit local, non poussé), à essayer au
+casque par le propriétaire avant publication. Cadré avec lui le 26/11 :
+- **Rotation 8D** (le son, ramené au centre, tourne autour de la tête ; vitesse 2 à 40
+  tours/min, sens, intensité) avec **deux moteurs au choix** : *tête simplifiée* (modèle
+  sphérique de Brown et Duda : décalage et ombre entre les oreilles, assourdi derrière) et
+  *tête mesurée* (HRTF de la base **SADIE II**, sujet D1 Neumann KU100, Université d'York,
+  licence Apache 2.0, plan horizontal tous les 5°, 256 coefficients, 44,1 et 48 kHz
+  d'origine, autres fréquences rééchantillonnées ; `src-tauri/assets/hrir/`, LISEZ-MOI).
+- **Acoustique de salle** (Freeverb, 6 salles : Studio, Chambre, Club, Salle de concert,
+  Cathédrale, Arène ; taille, dosage, murs mats, distance des murs) ; mode léger = moitié
+  moins de filtres.
+- **Global et par playlist** : réglages globaux dans `session.json` (`immersive`), ambiance
+  propre à une playlist appliquée quand la lecture part d'elle (Lire, Aléatoire, un titre).
+- Interface : panneau « Mode immersif » dans les Réglages (tête vue de dessus animée, salle en
+  ondes, « Maintenir pour comparer »), bouton dans « À l'écoute » et sur chaque playlist.
+- Code : `immersive.rs` (après l'égaliseur, sortie toujours stéréo, plus de 2 canaux :
+  inchangé), `stores/immersive.ts`, `Immersive.vue`, `ImmersiveDialog.vue`. Coût mesuré
+  (`cargo test --release --lib -- --ignored --nocapture cout_du_mode_immersif`) : 0,2 % d'un
+  cœur (tête), 0,8 % (HRTF + salle) sur le i7 de ce PC.
+- Essai réel (exe debug piloté) : MP3, M4A, WAV lus avec HRTF + Cathédrale, bascule de moteur,
+  « Comparer », mode léger et saut pendant la lecture, sans erreur ; réglages bien enregistrés.
+  **Pas encore écouté à l'oreille.** Deux FLAC de Damso (« Vieux Sons ») refusent de se lire :
+  fichiers remplis de zéros, sans rapport avec ce lot.
+- Reste avant publication : écoute au casque (bureau et Pixel 6 Pro), nouveautés de la 0.14.0
+  dans `src/nouveautes.json`, montée de version.
 
 ## Versions récentes
 
@@ -49,10 +72,7 @@ ont été supprimés le 20/11 avec l'accord du propriétaire.
 
 ## À faire ensuite
 
-**0.14.0 Mode immersif** (prochain) : spatialisation du son en Rust (effet 8D qui tourne autour
-de la tête, acoustique de salle ou de concert), réglable, avec le même soin « ludique » que
-l'égaliseur. À cadrer avec le propriétaire avant de coder (effets voulus, réglages, coût sur
-les téléphones modestes).
+**0.14.0 Mode immersif** : codé, voir « En cours ».
 
 **Ensuite** :
 - Notifications comme WhatsApp, appli fermée : notifications poussées par le relais via

@@ -11,6 +11,8 @@ import { usePlayerStore } from "@/stores/player";
 import { useUiStore } from "@/stores/ui";
 import Artwork from "./Artwork.vue";
 import Icon from "./Icon.vue";
+import ImmersiveDialog from "./ImmersiveDialog.vue";
+import { describeImmersive, useImmersiveStore } from "@/stores/immersive";
 import LyricsView from "./LyricsView.vue";
 import EndOfQueue from "./EndOfQueue.vue";
 import QueueList from "./QueueList.vue";
@@ -93,10 +95,14 @@ const nextTrack = computed(() => {
   return id ? library.byId(id) : null;
 });
 const showQueue = ref(false);
+const immersive = useImmersiveStore();
+const showImmersive = ref(false);
+const immersiveOn = computed(() => immersive.effective.enabled && (immersive.effective.rotation || immersive.effective.room));
 
 function onKey(e: KeyboardEvent) {
   if (e.key !== "Escape") return;
-  if (showQueue.value) showQueue.value = false;
+  if (showImmersive.value) showImmersive.value = false;
+  else if (showQueue.value) showQueue.value = false;
   else ui.closeNowPlaying();
 }
 onMounted(() => window.addEventListener("keydown", onKey));
@@ -141,6 +147,16 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
         @click="toggleVisualizer"
       >
         <Icon name="eq" :size="18" />
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        :class="{ on: immersiveOn }"
+        :title="`Mode immersif : ${describeImmersive(immersive.effective)}`"
+        aria-label="Mode immersif"
+        @click="showImmersive = true"
+      >
+        <Icon name="orbit" :size="18" />
       </button>
       <button type="button" class="icon-btn" title="Fermer ce morceau" aria-label="Fermer ce morceau" @click="closeTrack">
         <Icon name="close" :size="18" />
@@ -234,6 +250,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
         <QueueList />
       </div>
     </div>
+    <ImmersiveDialog v-if="showImmersive" @close="showImmersive = false" />
   </section>
 </template>
 

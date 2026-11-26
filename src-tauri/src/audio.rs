@@ -334,7 +334,7 @@ impl Engine {
                     let player = Player::connect_new(&self.mixer);
                     player.set_volume(volume);
                     self.volume = volume;
-                    player.append(crate::spectrum::Tap::new(EqSource::new(decoder, self.eq_gains.clone())));
+                    player.append(crate::spectrum::Tap::new(crate::immersive::ImmersiveSource::new(EqSource::new(decoder, self.eq_gains.clone()))));
                     self.player = Some(Arc::new(player));
                     self.pending_seek = None;
                     let mut st = status.locked();

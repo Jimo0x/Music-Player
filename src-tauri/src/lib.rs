@@ -7,6 +7,7 @@ pub mod default_app;
 pub mod duplicates;
 pub mod eq;
 pub mod favorites;
+pub mod immersive;
 pub mod ffmpeg;
 pub mod library;
 pub mod media_controls;
@@ -216,6 +217,12 @@ pub fn run() {
             commands::move_track_in_playlist,
             commands::set_eq_gains,
             commands::get_eq_gains,
+            commands::get_immersive,
+            commands::set_immersive,
+            commands::set_playlist_immersive,
+            commands::set_immersive_context,
+            commands::set_immersive_bypass,
+            commands::set_immersive_lite,
             commands::get_initial_state,
             commands::save_session,
             commands::toggle_favorite,

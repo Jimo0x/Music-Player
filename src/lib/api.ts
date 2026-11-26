@@ -11,6 +11,8 @@ import type {
   FetchWanted,
   LinkPlaylist,
   MediaLink,
+  ImmersiveProfiles,
+  ImmersiveSettings,
   InitialState,
   Lyrics,
   LyricsCandidate,
@@ -141,6 +143,16 @@ export const api = {
 
   setEqGains: (gains: number[]) => invoke<void>("set_eq_gains", { gains }),
   getEqGains: () => invoke<number[]>("get_eq_gains"),
+
+  getImmersive: () => invoke<ImmersiveProfiles>("get_immersive"),
+  setImmersive: (settings: ImmersiveSettings) => invoke<ImmersiveProfiles>("set_immersive", { settings }),
+  /** Ambiance propre à une playlist ; null : elle suit les réglages globaux. */
+  setPlaylistImmersive: (playlistId: string, settings: ImmersiveSettings | null) =>
+    invoke<ImmersiveProfiles>("set_playlist_immersive", { playlistId, settings }),
+  /** Playlist d'où vient la lecture lancée (null : ailleurs). */
+  setImmersiveContext: (playlistId: string | null) => invoke<ImmersiveProfiles>("set_immersive_context", { playlistId }),
+  setImmersiveBypass: (on: boolean) => invoke<void>("set_immersive_bypass", { on }),
+  setImmersiveLite: (on: boolean) => invoke<void>("set_immersive_lite", { on }),
 
   /** Inverse l'état « aimé » d'un morceau ; renvoie le nouvel état. */
   toggleFavorite: (trackId: string) => invoke<boolean>("toggle_favorite", { trackId }),
