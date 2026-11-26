@@ -122,6 +122,8 @@ export const api = {
   deleteAsset: (name: string) => invoke<void>("delete_asset", { name }),
   /** Contenu d'un fichier importé (base64), pour le joindre à un paquet de thème. */
   readAsset: (name: string) => invoke<string>("read_asset", { name }),
+  /** Forme d'onde d'un morceau (160 barres de 0 à 255), calculée une fois puis gardée. */
+  trackWaveform: (trackId: string) => invoke<number[]>("track_waveform", { trackId }),
   deletePlaylist: (id: string) => invoke<void>("delete_playlist", { id }),
   renamePlaylist: (id: string, name: string) => invoke<void>("rename_playlist", { id, name }),
   addToPlaylist: (playlistId: string, trackId: string) =>

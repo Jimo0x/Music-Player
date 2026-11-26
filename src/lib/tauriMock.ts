@@ -408,6 +408,15 @@ export function installTauriMock() {
     delete_asset: ({ name }) => {
       assets.delete(name);
     },
+    // Forme d'onde factice mais stable pour un même morceau (couplets, refrains, fin).
+    track_waveform: ({ trackId }) => {
+      let seed = [...String(trackId)].reduce((a, c) => a + c.charCodeAt(0), 7);
+      return Array.from({ length: 160 }, (_, i) => {
+        seed = (seed * 9301 + 49297) % 233280;
+        const swell = 0.55 + 0.45 * Math.sin((i / 160) * Math.PI * 3);
+        return Math.round(10 + 245 * Math.min(1, swell * (0.6 + 0.4 * (seed / 233280))));
+      });
+    },
     read_asset: async ({ name }) => {
       const url = assets.get(String(name));
       if (!url) throw "Fichier introuvable.";

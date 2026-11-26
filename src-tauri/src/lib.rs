@@ -28,6 +28,7 @@ pub mod transfer;
 pub mod shortcut_icon;
 pub mod state;
 pub mod updater;
+pub mod waveform;
 
 use crate::state::Locked;
 use state::AppState;
@@ -206,6 +207,7 @@ pub fn run() {
             commands::import_asset,
             commands::delete_asset,
             commands::read_asset,
+            commands::track_waveform,
             commands::add_to_playlist,
             commands::add_tracks_to_playlist,
             commands::remove_from_playlist,

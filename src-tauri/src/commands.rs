@@ -738,6 +738,20 @@ pub fn delete_asset(state: State<AppState>, name: String) -> Result<(), String> 
     crate::appearance::remove(&state.data_dir, &name)
 }
 
+/// Forme d'onde d'un morceau de la bibliothèque (barre de progression « forme d'onde ») : le
+/// chemin vient de la bibliothèque, jamais de l'interface.
+#[tauri::command(async)]
+pub fn track_waveform(state: State<'_, AppState>, track_id: String) -> Result<Vec<u8>, String> {
+    let path = state
+        .library
+        .locked()
+        .iter()
+        .find(|t| t.id == track_id)
+        .map(|t| PathBuf::from(&t.path))
+        .ok_or("Morceau introuvable.")?;
+    crate::waveform::waveform(&state.data_dir, &path)
+}
+
 /// Contenu d'un fichier importé, en base64 (paquet de thème : polices et image jointes).
 #[tauri::command(async)]
 pub fn read_asset(state: State<'_, AppState>, name: String) -> Result<String, String> {
