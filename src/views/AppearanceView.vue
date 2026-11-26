@@ -9,6 +9,8 @@ import { useAppearanceStore, type ButtonShape, type ButtonStyle, type FieldShape
 import { parseThemePack } from "@/lib/themePack";
 import { api } from "@/lib/api";
 import { shareFile } from "@/lib/androidMedia";
+import { SEEK_STYLES, type SeekStyle } from "@/lib/seekStyles";
+import SeekBar from "@/components/SeekBar.vue";
 import { ICON_NAMES } from "@/lib/iconPack";
 import { PATTERNS, patternMask, type PatternId, type PatternSettings } from "@/lib/patterns";
 import type { BackdropSource } from "@/lib/backdrop";
@@ -287,6 +289,12 @@ function patternPreview(id: PatternId) {
 }
 function setPattern(change: Partial<PatternSettings>) {
   Object.assign(s.value.pattern, change);
+  appearance.changed();
+}
+
+// ---- Barre de progression (lot 0.13.0) ----
+function setSeekStyle(id: SeekStyle) {
+  s.value.seekStyle = id;
   appearance.changed();
 }
 
@@ -666,6 +674,17 @@ const VINYL_COLORS: { id: VinylColor; label: string }[] = [
         <input type="checkbox" :checked="visuals.visualizer" @change="visuals.setVisualizer(($event.target as HTMLInputElement).checked)" />
         <span>Visualiseur du son (couronne autour du vinyle, barres en bas de l'écran)</span>
       </label>
+    </section>
+
+    <section class="card">
+      <h2>Barre de progression</h2>
+      <p class="muted small">Sur l'écran « À l'écoute ». La forme d'onde est celle du vrai morceau, calculée une fois puis gardée.</p>
+      <div class="seek-styles" role="radiogroup" aria-label="Style de la barre de progression">
+        <button v-for="o in SEEK_STYLES" :key="o.id" type="button" role="radio" class="seek-style" :class="{ on: s.seekStyle === o.id }" :aria-checked="s.seekStyle === o.id" @click="setSeekStyle(o.id)">
+          <span class="seek-demo"><SeekBar variant="hero" :look="o.id" :preview="0.42" /></span>
+          <span class="seek-label">{{ o.label }}</span>
+        </button>
+      </div>
     </section>
 
     <section class="card">
@@ -1216,6 +1235,42 @@ h2 {
 .icon-name.mine {
   background: var(--accent-soft);
   color: var(--accent);
+}
+.seek-styles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2);
+}
+.seek-style {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: rgba(var(--fg-rgb), 0.04);
+  color: var(--text);
+  font: inherit;
+}
+.seek-style.on {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.seek-demo {
+  display: flex;
+  align-items: center;
+  height: 64px;
+  padding: 0 14px;
+  border-radius: calc(var(--radius) * 0.7);
+  /* Les barres de « À l'écoute » sont faites pour un fond sombre (la pochette floutée). */
+  background: linear-gradient(135deg, #1a1430, #0b0b14);
+  --visual: var(--accent);
+}
+.seek-demo > * {
+  flex: 1;
+}
+.seek-label {
+  font-size: 12px;
+  text-align: center;
 }
 .patterns {
   display: grid;

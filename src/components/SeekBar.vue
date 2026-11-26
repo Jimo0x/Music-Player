@@ -1,16 +1,56 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { api } from "@/lib/api";
 import { useFrame } from "@/lib/clock";
 import { formatDuration } from "@/lib/format";
+import { seekMask, waveformMask, type SeekStyle } from "@/lib/seekStyles";
+import { useAppearanceStore } from "@/stores/appearance";
 import { usePlayerStore } from "@/stores/player";
 
 // Barre de progression : avance à chaque image, curseur et heure visée au survol (souris)
 // ou pendant le glisser (doigt), saut au relâchement ; flèches ±5 s, Début et Fin au clavier.
 // « hero » : écran « À l'écoute » ; « lcd » : fine ligne au bas de l'afficheur de la barre.
-withDefaults(defineProps<{ variant?: "hero" | "lcd" }>(), { variant: "hero" });
+// Style choisi dans la personnalisation (« À l'écoute » seulement) ; `look` et `preview` :
+// aperçu figé d'un style dans la page Personnalisation (position fixe, sans morceau).
+const props = withDefaults(defineProps<{ variant?: "hero" | "lcd"; look?: SeekStyle | null; preview?: number | null }>(), {
+  variant: "hero",
+  look: null,
+  preview: null,
+});
 const emit = defineEmits<{ (e: "dragging", value: number | null): void }>();
 
 const player = usePlayerStore();
+const appearance = useAppearanceStore();
+const style = computed<SeekStyle>(() => props.look ?? (props.variant === "hero" ? appearance.settings.seekStyle : "classic"));
+/** Styles dessinés par un masque : fond discret + copie colorée découpée jusqu'à la position. */
+const masked = computed(() => ["wave", "dots", "segments", "waveform"].includes(style.value));
+
+// Vraie forme d'onde du morceau (calculée une fois par le moteur, puis en cache).
+const bars = ref<number[] | null>(null);
+watch(
+  () => (style.value === "waveform" && props.preview === null ? (player.currentTrack?.id ?? null) : null),
+  async (id) => {
+    bars.value = null;
+    if (!id) return;
+    try {
+      const got = await api.trackWaveform(id);
+      if (player.currentTrack?.id === id) bars.value = got;
+    } catch {
+      // morceau illisible pour l'analyse : barres régulières
+    }
+  },
+  { immediate: true },
+);
+// Aperçu : une forme d'onde inventée mais régulière (couplet, refrain, fin).
+const previewBars = Array.from({ length: 160 }, (_, i) => Math.round(40 + 200 * Math.abs(Math.sin(i / 9) * Math.sin(i / 37))));
+const maskStyle = computed(() => {
+  if (style.value === "waveform") {
+    const image = waveformMask(props.preview !== null ? previewBars : bars.value);
+    return { maskImage: image, WebkitMaskImage: image, maskSize: "100% 100%", WebkitMaskSize: "100% 100%" };
+  }
+  const mask = seekMask(style.value);
+  return mask ? { maskImage: mask.image, WebkitMaskImage: mask.image, maskSize: mask.size, WebkitMaskSize: mask.size } : undefined;
+});
 const duration = computed(() => player.currentTrack?.duration_secs ?? 0);
 const dragging = ref<number | null>(null);
 /** Survol à la souris : position (0 à 1) et heure correspondante. */
@@ -21,8 +61,16 @@ const fill = ref<HTMLElement | null>(null);
 const knob = ref<HTMLElement | null>(null);
 
 function paint(pos: number) {
-  const ratio = duration.value ? Math.min(1, Math.max(0, pos / duration.value)) : 0;
-  if (fill.value) fill.value.style.transform = `scaleX(${ratio})`;
+  const ratio = props.preview !== null ? props.preview : duration.value ? Math.min(1, Math.max(0, pos / duration.value)) : 0;
+  if (fill.value) {
+    if (masked.value) {
+      fill.value.style.transform = "";
+      fill.value.style.clipPath = `inset(0 ${((1 - ratio) * 100).toFixed(2)}% 0 0)`;
+    } else {
+      fill.value.style.clipPath = "";
+      fill.value.style.transform = `scaleX(${ratio})`;
+    }
+  }
   if (knob.value) knob.value.style.left = `${ratio * 100}%`;
 }
 useFrame((t) => paint(dragging.value ?? player.positionAt(t)));
@@ -32,7 +80,7 @@ function ratioOf(e: PointerEvent): number {
   return Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
 }
 function down(e: PointerEvent) {
-  if (!duration.value) return;
+  if (!duration.value || props.preview !== null) return;
   (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   dragging.value = ratioOf(e) * duration.value;
   emit("dragging", dragging.value);
@@ -75,7 +123,7 @@ const bubble = computed(() => {
 <template>
   <div
     class="seek"
-    :class="[variant, { dragging: dragging !== null, hovering: hover !== null }]"
+    :class="[variant, `look-${style}`, { masked, dragging: dragging !== null, hovering: hover !== null, playing: !!player.currentTrack && !player.isPaused && preview === null, preview: preview !== null }]"
     role="slider"
     tabindex="0"
     aria-label="Position dans le morceau"
@@ -91,8 +139,9 @@ const bubble = computed(() => {
     @keydown="key"
   >
     <div ref="track" class="track">
-      <div v-if="hover !== null && dragging === null" class="ghost" :style="{ transform: `scaleX(${hover})` }" />
-      <div ref="fill" class="fill" />
+      <div v-if="masked" class="base" :style="maskStyle" />
+      <div v-if="hover !== null && dragging === null && !masked" class="ghost" :style="{ transform: `scaleX(${hover})` }" />
+      <div ref="fill" class="fill" :style="masked ? maskStyle : undefined" />
     </div>
     <span ref="knob" class="knob" />
     <span v-if="bubble" class="bubble" :style="{ left: `${bubble.at * 100}%` }">{{ formatDuration(bubble.time) }}</span>
@@ -230,10 +279,99 @@ const bubble = computed(() => {
   background: var(--accent);
   color: #fff;
 }
+
+/* ---- Styles de « À l'écoute » (lot 0.13.0) ---- */
+.hero.masked .track {
+  overflow: visible;
+  border-radius: 0;
+  background: none;
+}
+.hero.masked:hover .track,
+.hero.masked.dragging .track {
+  height: auto;
+}
+.base,
+.hero.masked .fill {
+  position: absolute;
+  inset: 0;
+  mask-repeat: repeat-x;
+  -webkit-mask-repeat: repeat-x;
+  mask-position: 0 50%;
+  -webkit-mask-position: 0 50%;
+}
+.base {
+  background: rgba(255, 255, 255, 0.26);
+}
+.hero.masked .fill {
+  box-shadow: none;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--visual, #fff) 55%, transparent));
+}
+.hero.look-wave .track {
+  height: 16px;
+}
+.hero.look-dots .track {
+  height: 10px;
+}
+.hero.look-segments .track {
+  height: 12px;
+}
+.hero.look-waveform .track {
+  height: 36px;
+}
+.hero.look-waveform .base,
+.hero.look-waveform .fill {
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+}
+/* Vague : elle ondule tant que le morceau joue, s'arrête en pause. */
+.hero.look-wave.playing .base,
+.hero.look-wave.playing .fill {
+  animation: seek-wave 1.1s linear infinite;
+}
+@keyframes seek-wave {
+  to {
+    mask-position: 24px 50%;
+    -webkit-mask-position: 24px 50%;
+  }
+}
+.hero.look-neon .track {
+  height: 5px;
+  border-radius: 3px;
+  overflow: visible;
+}
+.hero.look-neon .fill {
+  border-radius: 3px;
+  background: var(--visual, #7df9ff);
+  box-shadow:
+    0 0 6px var(--visual, #7df9ff),
+    0 0 16px color-mix(in srgb, var(--visual, #7df9ff) 70%, transparent),
+    0 0 30px color-mix(in srgb, var(--visual, #7df9ff) 45%, transparent);
+}
+.hero.look-waveform .knob,
+.hero.look-segments .knob {
+  width: 3px;
+  height: 120%;
+  margin-left: -1.5px;
+  border-radius: 2px;
+}
+.preview {
+  pointer-events: none;
+}
+.preview .knob {
+  transform: translateY(-50%) scale(1);
+}
+:global(:root[data-perf="lite"]) .look-wave .base,
+:global(:root[data-perf="lite"]) .look-wave .fill {
+  animation: none !important;
+}
 @media (prefers-reduced-motion: reduce) {
   .track,
   .knob {
     transition: none;
+  }
+  .look-wave .base,
+  .look-wave .fill {
+    animation: none !important;
   }
 }
 </style>

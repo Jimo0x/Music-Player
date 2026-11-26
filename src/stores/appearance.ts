@@ -7,6 +7,7 @@ import { defaultBackdrop, normalizeBackdrop, prepareBackdropImage, type Backdrop
 import { defaultPattern, normalizePattern, type PatternSettings } from "@/lib/patterns";
 import { iconNameOf, normalizeIcons, sanitizeSvg, setCustomIcons, type CustomIcon } from "@/lib/iconPack";
 import { buildThemePack, type ParsedThemePack } from "@/lib/themePack";
+import { normalizeSeekStyle, type SeekStyle } from "@/lib/seekStyles";
 
 // Personnalisation de l'application : thème et mode clair / sombre, polices, boutons et
 // champs, icônes, profil, icône de l'application. Enregistrée côté Rust (appearance.json,
@@ -45,6 +46,8 @@ export interface AppearanceSettings {
   pattern: PatternSettings;
   /** Jeu d'icônes importé, par nom d'icône (lot 0.12.0). */
   customIcons: Record<string, CustomIcon>;
+  /** Style de la barre de progression de « À l'écoute » (lot 0.13.0). */
+  seekStyle: SeekStyle;
 }
 
 const CACHE_KEY = "mp:appearance-vars";
@@ -68,6 +71,7 @@ export function defaultAppearance(): AppearanceSettings {
     backdrop: defaultBackdrop(),
     pattern: defaultPattern(),
     customIcons: {},
+    seekStyle: "classic",
   };
 }
 
@@ -109,6 +113,7 @@ function normalize(raw: unknown): AppearanceSettings {
     backdrop: normalizeBackdrop(o.backdrop),
     pattern: normalizePattern(o.pattern),
     customIcons: normalizeIcons(o.customIcons),
+    seekStyle: normalizeSeekStyle(o.seekStyle),
   };
 }
 
