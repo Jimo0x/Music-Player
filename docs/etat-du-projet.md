@@ -1,30 +1,21 @@
 # État du projet
 
-Mis à jour le **20 novembre 2026** (soir) : **0.10.4** publiée, rien en cours. À tenir à jour à
+Mis à jour le **26 novembre 2026** : **0.13.0** publiée, rien en cours. À tenir à jour à
 chaque version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
 
 ## En cours : à reprendre en premier
 
-Rien en cours. Prochain chantier proposé : le lot **0.11.0 « Envoyer »** (voir « À faire
-ensuite »).
-
-### Fait le 20/11 : retour de la mise à jour Android par l'appli (0.10.2)
-
-Décision du propriétaire : la mise à jour par le navigateur bloquait et pouvait abîmer le
-fichier (0.10.0 refusée sur le Pixel 6 Pro : « SHA-256 digest of contents did not verify »).
-L'appli télécharge de nouveau l'APK par le service de téléchargement d'Android, puis ouvre
-l'installation ; le navigateur reste en secours. Ajouté : l'APK reçu est comparé à l'empreinte
-SHA-256 publiée par GitHub (champ `digest` de la version) avant l'installation ; s'il diffère,
-il est effacé, retéléchargé une fois, puis un message clair s'affiche. Seules les adresses de
-version du projet sont acceptées. **Essai réel réussi** sur l'émulateur Android 14 : une 0.10.0
-signée avec la clé de version a proposé la 0.10.1, l'a téléchargée, vérifiée puis installée.
-Pas essayé en réel : le cas d'un fichier abîmé (écrit et testé en logique seulement).
-Risque Play Protect connu et accepté (voir plus bas).
+Rien en cours, aucune demande de fusion ouverte, aucun ticket ouvert. Prochain chantier voulu
+par le propriétaire : le lot **0.14.0 Mode immersif** (voir « À faire ensuite »).
 
 ## Versions récentes
 
 | Version | Date | Contenu principal |
 | --- | --- | --- |
+| 0.13.0 | 26/11/2026 | Lot Ludique : vraie forme d'onde du morceau (Rust, `waveform.rs`, en cache) ; 6 styles de barre de progression sur « À l'écoute » (classique, vague, forme d'onde, perles, néon, segments) ; égaliseur 10 bandes (32 Hz à 16 kHz, anciens réglages à 3 bandes convertis) avec courbe à façonner, spectre en direct, 13 préréglages et « Comparer » ; choix de la sortie audio sur ordinateur ; « Quoi de neuf ? » en cartes avec « Essayer » ; accès rapides Télécharger et baladeur sur l'accueil du téléphone |
+| 0.12.0 | 26/11/2026 | Lot Personnalisation : arrière-plan (image ou pochette en cours, flou, voile, cadrage) ; motifs sur le fond ; couleurs avancées d'un thème ; jeu d'icônes SVG importé et nettoyé ; jaquettes faites des pochettes (une ou mosaïque de 4) ; paquet de thème complet `.mptheme` |
+| 0.11.1 | 21/11/2026 | Partage par code fiable (contributeur, #21) : bogue 103 → 97 corrigé (doublons répartis sur deux parties), reprise 30 min puis avec le même code, avancement de tout l'envoi, résumé à l'arrivée ; `latest.json` écrit par une seule tâche CI (#20) |
+| 0.11.0 | 21/11/2026 | Contributeur : envoi de plusieurs sons et playlists d'un coup, plus de limite de 300 sons (liste complète en colis chiffré), recherche « Sur Internet » dans la barre de recherche |
 | 0.10.4 | 20/11/2026 | Correspondance des téléchargements : l'artiste est aussi reconnu dans le titre de la vidéo (chaîne de paroles, chaîne absente des résultats, plusieurs artistes), mentions « (feat.) », « [From …] » ignorées ; essai réel sur les Top 50 France et Monde lus sur Spotify : 20 échecs sur 50 avant, 1 après, vidéos choisies vérifiées une à une. Liens courts du bouton « Partager » de Spotify (`spotify.link`, `spoti.fi`) suivis jusqu'au vrai lien |
 | 0.10.3 | 20/11/2026 | Contributeur : recherche avec liste de résultats dans Télécharger (15 résultats, miniature, chaîne, durée, « Meilleur résultat » garde l'ancien choix automatique) ; recherche tapée à l'envers (« Titre - Artiste ») |
 | 0.10.2 | 20/11/2026 | Mise à jour Android de nouveau faite par l'appli, avec vérification SHA-256 de l'APK |
@@ -39,7 +30,7 @@ Publication : la tâche macOS de la 0.10.4 a échoué une fois au moment de mett
 même temps) ; relancée seule, elle est passée (9 plateformes). Si ça revient : relancer la tâche
 en échec, ou faire mettre à jour `latest.json` par une seule tâche à la fin.
 
-## Avis des utilisateurs (5 sur le relais au 20/11)
+## Avis des utilisateurs (5 sur le relais au 26/11, aucun nouveau depuis le 20/11)
 
 Lus avec le code administrateur (`%USERPROFILE%\.music-player-avis\code-admin.txt`) :
 `POST https://music-player-relais.loickamg.workers.dev/v1/avis/liste` avec `{"admin": code}` ;
@@ -48,7 +39,7 @@ Ne supprimer qu'avec l'accord du propriétaire.
 
 | Avis (début de l'id) | Sujet | État |
 | --- | --- | --- |
-| `0f6f48d3` (19/11, 0.9.0) | Envoyer plusieurs sons d'un coup ; dans la discussion, « + » doit permettre de choisir plusieurs sons et plusieurs playlists | **À faire** (lot 0.11.0) |
+| `0f6f48d3` (19/11, 0.9.0) | Envoyer plusieurs sons d'un coup ; dans la discussion, « + » doit permettre de choisir plusieurs sons et plusieurs playlists | Fait en 0.11.0 (envoi groupé de sons et de playlists), confirmation du testeur attendue |
 | `8a2b18bc` | Tri dans Favoris et les playlists | Fait (0.8.0 playlists, 0.9.0 Favoris), confirmé par le propriétaire le 20/11 (« les filtres, c'est fait ») |
 | `a6243c4d` | %, Mo et temps restant pendant un envoi | Fait en 0.9.0, confirmation attendue |
 | `86f96b44`, `23757f22` | Enregistrements Audiolab .wav/.m4a illisibles | Fait en 0.9.0 (le trou était l'Opus dans un .m4a), confirmation attendue |
@@ -58,30 +49,10 @@ ont été supprimés le 20/11 avec l'accord du propriétaire.
 
 ## À faire ensuite
 
-Retours du propriétaire (vocaux du 20/11) et demandes du même jour, regroupés en lots.
-
-**0.11.0 « Envoyer »** (prochain, **confié à Jimo0x le 20/11** : tickets #8 à #11 ; petites choses : #12) :
-1. Envoyer **plusieurs sons d'un coup** (sélection, ou sons d'une playlist) avec « Envoyer à
-   quelqu'un » ; avis `0f6f48d3`.
-2. Envoyer **plusieurs playlists d'un coup**, dans la discussion ou ailleurs.
-3. **Plus de limite de 300 sons** pour une playlist jointe à un message : aujourd'hui, une
-   playlist jointe est décrite dans le message lui-même, plafonné par le relais (`MAX_BODY`,
-   96 Ko, « 300 morceaux décrits au plus »).
-4. **Partage par code fiable** : une playlist part en parties de 40 morceaux ou 150 Mo
-   (`sharing::PART_TRACKS`, `PART_BYTES`) ; si une partie échoue (coupure chez le
-   destinataire), la suite est abandonnée sans reprise. À faire : reprise après coupure,
-   avancement clair, explication du premier essai (103 morceaux envoyés, 97 ou 98 reçus :
-   probablement des doublons fusionnés à l'arrivée, à vérifier), et avis sur le découpage et
-   les limites du relais gratuit.
-
-**0.12.0 Personnalisation totale** : import de thèmes, d'icônes et de polices ; jaquettes de
-playlists ; couleurs, motifs, arrière-plans.
-
-**0.13.0 Ludique** : plusieurs barres de progression (vagues, style inspiré du lecteur de
-Huawei…) ; égaliseur et réglages de sortie audio plus amusants ; « Quoi de neuf ? »
-interactif ; accès rapides sur téléphone (Télécharger, mode baladeur hors des Réglages).
-
-**0.14.0 Mode immersif** : spatialisation du son (effet 8D, acoustique de salle), en Rust.
+**0.14.0 Mode immersif** (prochain) : spatialisation du son en Rust (effet 8D qui tourne autour
+de la tête, acoustique de salle ou de concert), réglable, avec le même soin « ludique » que
+l'égaliseur. À cadrer avec le propriétaire avant de coder (effets voulus, réglages, coût sur
+les téléphones modestes).
 
 **Ensuite** :
 - Notifications comme WhatsApp, appli fermée : notifications poussées par le relais via
@@ -93,30 +64,33 @@ interactif ; accès rapides sur téléphone (Télécharger, mode baladeur hors d
   environ 1 200 textes).
 - Revue de sécurité, puis optimisation poussée.
 
-**Petites choses** : sur téléphone, les titres de la liste de résultats sont coupés court (deux
-lignes aideraient) ; dans `src/lib/api.ts`, le commentaire de `fetchReadLink` est au-dessus de
-`fetchSearch`.
-
 ### Points en attente d'une décision du propriétaire
 
 - **Fichiers d'outillage publiés dans le dépôt**, contraire à sa règle globale : le fichier de
   consignes à la racine (suivi depuis `6fa2185`, bien que listé dans `.git/info/exclude`), le
   lien du README vers lui et le document de prompt dans `docs/`. Proposé : retirer le fichier
   du suivi (`git rm --cached`, il reste sur le disque), retirer le lien et le document.
-- Supprimer `C:\Android\sdk` et `C:\Android\dl` (≈ 3,6 Go inutiles ; disque C: presque plein).
+- Supprimer `C:\Android\sdk` et `C:\Android\dl` (≈ 3,6 Go inutiles).
 - Supprimer la branche locale `sauvegarde-main-avant-nettoyage` (ancien `main`, voir
   « Contributeur »).
 - Rendre la tâche CI « commits » obligatoire dans la protection de `main` (réglage GitHub,
-  à faire par le propriétaire).
+  à faire par le propriétaire ; elle a déjà tourné sur des demandes de fusion).
 
 ## Vérifications sur de vrais appareils
 
 Rien de cette liste n'a été essayé sur un vrai téléphone ou une vraie machine, sauf mention.
 
-- **Pixel 6 Pro (Android 17)** : 0.10.1 puis 0.10.3 installées par câble le 20/11
-  (`adb install -r`, données gardées). À essayer : la mise à jour 0.10.4 par l'appli,
-  la recherche avec liste de résultats, « Télécharger les manquants », un vrai lien
-  `spotify.link`.
+- **Pixel 6 Pro (Android 17)** : 0.10.3 installée par câble le 20/11. À essayer : la mise
+  à jour par l'appli jusqu'à la 0.13.0, la recherche avec liste de résultats et « Sur
+  Internet », « Télécharger les manquants », un vrai lien `spotify.link`, l'égaliseur
+  10 bandes à l'oreille, les styles de barre, les accès rapides.
+- **Vraie appli de bureau (Windows)** : lots 0.12.0 et 0.13.0 essayés le 26/11 (exe de
+  débogage piloté par DevTools, données sauvegardées puis remises à l'identique) : fond,
+  motif, couleurs avancées, icônes, paquet de thème, mosaïque, forme d'onde, égaliseur
+  10 bandes reçu par le moteur, bascule de sortie audio sans coupure. Le PC n'a qu'une
+  sortie (« Speakers ») : bascule entre deux sorties différentes pas essayée.
+- **Partage par code** d'une grosse playlist avec coupure du Wi-Fi chez le destinataire
+  (0.11.1) ; envoi de plusieurs sons et playlists entre deux appareils (0.11.0).
 - **Moov Smart Pro** (0.5.15 installée le 18/11) : sons Dolby de The Weeknd (Trilogy,
   Starboy, After Hours, Kiss Land : 73 fichiers en E-AC-3 5.1) après mise à jour.
 - **Écran verrouillé du PC** dans la vraie appli (Windows) ; **Linux / CachyOS** (AppImage,
@@ -142,21 +116,21 @@ Rien de cette liste n'a été essayé sur un vrai téléphone ou une vraie machi
 
 ## Contributeur
 
-**Jimo0x** (fork `Jimo0x/Music-Player`, branches `correctif/…` et `fonction/…`). Demandes #1,
-#2 et #3 fusionnées le 20/11 (merge commits) ; #6 (liste de résultats) et #7 (recherche
-inversée) relues, essayées (recherche réelle avec yt-dlp, écran en mode démo), approuvées et
-fusionnées **en un seul commit chacune, au message réécrit**. Toute relecture commence par
-**@Jimo0x** (sinon il n'est pas toujours prévenu).
+**Jimo0x** (fork `Jimo0x/Music-Player`, branches `correctif/…` et `fonction/…`). Le 20-21/11 :
+#1 à #3, #6, #7, #14 à #17, #19 à #21 relues, vérifiées et fusionnées (tickets #8 à #12 et #18
+fermés). Toute relecture commence par **@Jimo0x** (sinon il n'est pas toujours prévenu).
+Fusionner ses demandes **en un seul commit au message relu** (sans ligne d'attribution).
+Demandes empilées (#15 ⊂ #16 ⊂ #17 le 21/11) : après chaque fusion, rebaser la suivante sur
+`main` en ne gardant que son propre commit (il autorise les modifications du propriétaire).
 
 **Lignes d'attribution retirées (20/11)** : ses commits portaient `Co-Authored-By:` (un outil)
 et un lien de session ; GitHub listait l'outil parmi les contributeurs. Avec l'accord du
 propriétaire, `main` a été réécrit (messages seulement, contenu identique, auteurs et dates
 gardés) puis poussé en force ; les étiquettes `app-v0.10.1` et `app-v0.10.2` ont été déplacées
 sur les nouveaux commits (versions et fichiers intacts). L'ancien `main` reste dans la branche
-locale `sauvegarde-main-avant-nettoyage`. Jimo0x doit remettre son fork à jour sur le nouveau
-`main`. Depuis : règle d'or n° 7 de `CONTRIBUTING.md`, case du modèle de demande de fusion, et
-tâche CI « commits » qui refuse un commit portant `Co-Authored-By:`, « Generated with … » ou un
-lien de session. Fusionner ses demandes en un seul commit au message relu.
+locale `sauvegarde-main-avant-nettoyage`. Depuis : règle d'or n° 7 de `CONTRIBUTING.md`, case
+du modèle de demande de fusion, et tâche CI « commits » qui refuse un commit portant
+`Co-Authored-By:`, « Generated with … » ou un lien de session.
 
 ## Fait les 18-20/11 (détail utile)
 
@@ -182,6 +156,23 @@ lien de session. Fusionner ses demandes en un seul commit au message relu.
 
 ## Repères techniques récents
 
+- Lot 0.13.0 : `src-tauri/src/waveform.rs` (forme d'onde, cache `ondes/`, commande
+  `track_waveform`) ; `src/lib/seekStyles.ts` + `SeekBar.vue` (props `look`, `preview`) ;
+  `src-tauri/src/eq.rs` (`BANDS = 10`, `gains_from_values` convertit 3 → 10,
+  `deserialize_gains` pour `session.json`) + `src/stores/eq.ts` + `Equalizer.vue` ;
+  sortie audio : `audio.rs` (`OUTPUT_CHOICE`, `SWITCH_OUTPUT` traité comme un flux perdu),
+  `session.output_device`, `OutputDevices.vue` ; `src/lib/whatsNewTour.ts` ;
+  accès rapides dans `RecentView.vue`.
+- Lot 0.12.0 : `src/lib/backdrop.ts` + `AppBackdrop.vue` (calque sous `.app` isolée) ;
+  `src/lib/patterns.ts` (masques SVG) ; couleurs avancées dans `themes.ts` ;
+  `src/lib/iconPack.ts` (nettoyeur SVG à liste fermée) + `iconPaths.ts` ;
+  `PlaylistCover.vue` (`trackIds`, mosaïque) ; `src/lib/themePack.ts` + commandes
+  `save_theme_pack`, `read_asset` (la CSP interdit `fetch()` sur les fichiers locaux).
+- Publication : insérer les nouveautés avec un contrôle `json.loads` (un premier « ] » dans
+  un texte avait cassé `nouveautes.json` le 21/11) et n'enchaîner l'envoi qu'après des
+  vérifications vertes.
+- Vidéo de présentation (hors dépôt) : projet séparé `~/projects/music-player-video`
+  (Remotion, captures du mode démo) ; voir son `LISEZ-MOI.md`.
 - Mise à jour Android : `src-tauri/src/updater.rs` (`sha256_of` lit le `digest` GitHub),
   `scripts/android-patch.mjs` (`Updates.digestOf`, `sha256Of`, `verifyApk`, `UpdateBridge.watch`,
   `UpdateDownloadedReceiver`), `src/stores/updater.ts`.
