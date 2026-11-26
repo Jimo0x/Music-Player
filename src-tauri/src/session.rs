@@ -16,8 +16,10 @@ pub struct SessionState {
     pub volume: f32,
     pub shuffle: bool,
     pub repeat: RepeatMode,
-    /// Gains en dB des 3 bandes de l'égaliseur : [basses, médiums, aigus].
-    pub eq_gains: [f32; 3],
+    /// Gains en dB des 10 bandes de l'égaliseur (32 Hz à 16 kHz). Une session d'une version à
+    /// 3 bandes [basses, médiums, aigus] est convertie à la lecture.
+    #[serde(default, deserialize_with = "crate::eq::deserialize_gains")]
+    pub eq_gains: crate::eq::Gains,
 }
 
 impl Default for SessionState {
@@ -30,7 +32,7 @@ impl Default for SessionState {
             volume: 1.0,
             shuffle: false,
             repeat: RepeatMode::Off,
-            eq_gains: [0.0, 0.0, 0.0],
+            eq_gains: [0.0; crate::eq::BANDS],
         }
     }
 }
@@ -130,7 +132,7 @@ mod tests {
             volume: 0.6,
             shuffle: true,
             repeat: RepeatMode::All,
-            eq_gains: [3.0, -2.0, 1.5],
+            eq_gains: crate::eq::from_three([3.0, -2.0, 1.5]),
         };
         state.save(&path).unwrap();
 
@@ -168,6 +170,6 @@ mod tests {
         assert!(state.current_track_id.is_none());
         assert_eq!(state.position_secs, 0.0);
         assert_eq!(state.volume, 1.0);
-        assert_eq!(state.eq_gains, [-12.0, 0.0, 12.0]);
+        assert_eq!(state.eq_gains, crate::eq::from_three([-12.0, 0.0, 12.0]));
     }
 }

@@ -1672,14 +1672,14 @@ pub fn import_share_bundle(app: AppHandle, path: String) -> Result<ImportResult,
 // ---------------------------------------------------------------------
 
 #[tauri::command]
-pub fn set_eq_gains(state: State<AppState>, gains: [f32; 3]) -> Result<(), String> {
-    let clamped = gains.map(|g| g.clamp(-12.0, 12.0));
-    *state.eq_gains.locked() = clamped;
+pub fn set_eq_gains(state: State<AppState>, gains: Vec<f32>) -> Result<(), String> {
+    let gains = crate::eq::gains_from_values(&gains).ok_or("Réglage de l'égaliseur invalide.")?;
+    *state.eq_gains.locked() = gains;
     Ok(())
 }
 
 #[tauri::command]
-pub fn get_eq_gains(state: State<AppState>) -> [f32; 3] {
+pub fn get_eq_gains(state: State<AppState>) -> crate::eq::Gains {
     *state.eq_gains.locked()
 }
 
@@ -1695,7 +1695,7 @@ pub struct InitialState {
     pub current_track: Option<Track>,
     pub position_secs: f64,
     pub volume: f32,
-    pub eq_gains: [f32; 3],
+    pub eq_gains: crate::eq::Gains,
     pub playlists: Vec<Playlist>,
     /// Identifiants des morceaux aimés.
     pub favorites: Vec<String>,

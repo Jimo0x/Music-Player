@@ -5,7 +5,7 @@ import { RELEASES } from "@/lib/whatsNew";
 import { api } from "@/lib/api";
 import { openDefaultApps } from "@/lib/androidMedia";
 import { formatCollection } from "@/lib/format";
-import { BAND_LABELS, EQ_PRESETS, useEqStore } from "@/stores/eq";
+import Equalizer from "@/components/Equalizer.vue";
 import { useLibraryStore } from "@/stores/library";
 import { useLyricsStore } from "@/stores/lyrics";
 import { usePlaylistsStore } from "@/stores/playlists";
@@ -22,7 +22,6 @@ import Icon from "@/components/Icon.vue";
 import LegalDialog from "@/components/LegalDialog.vue";
 
 const library = useLibraryStore();
-const eq = useEqStore();
 const lyrics = useLyricsStore();
 const updater = useUpdaterStore();
 const playlists = usePlaylistsStore();
@@ -299,16 +298,7 @@ const shortcuts = [
 
     <section class="section-card">
       <h2><Icon name="eq" :size="17" /> Égaliseur</h2>
-      <div class="presets">
-        <button v-for="p in EQ_PRESETS" :key="p.name" type="button" class="chip" :class="{ on: eq.activePreset === p.name }" @click="eq.applyPreset(p.gains)">{{ p.name }}</button>
-      </div>
-      <div class="bands">
-        <label v-for="(label, i) in BAND_LABELS" :key="label" class="band">
-          <span class="db">{{ eq.gains[i] > 0 ? "+" : "" }}{{ eq.gains[i] }} dB</span>
-          <input type="range" min="-12" max="12" step="1" :value="eq.gains[i]" :aria-label="label" @input="eq.setGain(i as 0 | 1 | 2, Number(($event.target as HTMLInputElement).value))" />
-          <span>{{ label }}</span>
-        </label>
-      </div>
+      <Equalizer />
     </section>
 
     <section class="section-card">
@@ -433,29 +423,6 @@ const shortcuts = [
 .chip.on {
   background: var(--accent);
   color: #fff;
-}
-.bands {
-  display: flex;
-  gap: 40px;
-  padding-left: 8px;
-}
-.band {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 12px;
-  color: var(--text-2);
-}
-.band input {
-  writing-mode: vertical-lr;
-  direction: rtl;
-  height: 120px;
-  accent-color: var(--accent);
-}
-.db {
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
 }
 .small {
   font-size: 12.5px;

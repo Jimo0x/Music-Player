@@ -130,7 +130,7 @@ export interface InitialState {
   current_track: Track | null;
   position_secs: number;
   volume: number;
-  eq_gains: [number, number, number];
+  eq_gains: number[];
   playlists: Playlist[];
   /** Identifiants des morceaux aimés. */
   favorites: string[];

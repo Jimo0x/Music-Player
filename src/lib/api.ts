@@ -135,8 +135,8 @@ export const api = {
   moveTrackInPlaylist: (playlistId: string, from: number, to: number) =>
     invoke<void>("move_track_in_playlist", { playlistId, from, to }),
 
-  setEqGains: (gains: [number, number, number]) => invoke<void>("set_eq_gains", { gains }),
-  getEqGains: () => invoke<[number, number, number]>("get_eq_gains"),
+  setEqGains: (gains: number[]) => invoke<void>("set_eq_gains", { gains }),
+  getEqGains: () => invoke<number[]>("get_eq_gains"),
 
   /** Inverse l'état « aimé » d'un morceau ; renvoie le nouvel état. */
   toggleFavorite: (trackId: string) => invoke<boolean>("toggle_favorite", { trackId }),

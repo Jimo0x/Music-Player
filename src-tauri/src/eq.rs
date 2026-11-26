@@ -1,9 +1,9 @@
-//! Mini égaliseur 3 bandes (basses / médiums / aigus), implémenté comme
-//! une cascade de 3 filtres "peaking" biquad (formules RBJ Audio EQ
-//! Cookbook), appliqués en direct sur le flux audio via un `rodio::Source`
-//! maison. Les gains sont partagés dans un `Arc<Mutex<[f32; 3]>>` pour
-//! pouvoir être ajustés en direct pendant la lecture, sans reconstruire
-//! le pipeline audio.
+//! Égaliseur 10 bandes d'octave (32 Hz à 16 kHz, lot 0.13.0), implémenté comme une cascade
+//! de filtres "peaking" biquad (formules RBJ Audio EQ Cookbook), appliqués en direct sur le
+//! flux audio via un `rodio::Source` maison. Les gains sont partagés dans un
+//! `Arc<Mutex<Gains>>` pour être ajustés pendant la lecture, sans reconstruire le pipeline
+//! audio. Une bande à 0 dB est sautée (moins de calcul sur les téléphones modestes).
+//! Les réglages des versions à 3 bandes (basses, médiums, aigus) sont convertis à la lecture.
 
 use crate::state::Locked;
 use rodio::source::SeekError;
@@ -11,9 +11,40 @@ use rodio::{ChannelCount, SampleRate, Source};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-/// Fréquences centrales des 3 bandes : basses, médiums, aigus (Hz).
-pub const BAND_FREQS: [f32; 3] = [120.0, 1000.0, 8000.0];
-const Q: f32 = 0.9;
+/// Nombre de bandes et leurs fréquences centrales (Hz), une par octave.
+pub const BANDS: usize = 10;
+pub const BAND_FREQS: [f32; BANDS] = [32.0, 64.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0];
+/// Largeur d'une octave : les bandes voisines se recouvrent juste assez pour une courbe lisse.
+const Q: f32 = 1.41;
+
+/// Gains en dB des 10 bandes.
+pub type Gains = [f32; BANDS];
+
+/// Réglage d'une ancienne version à 3 bandes (basses 120 Hz, médiums 1 kHz, aigus 8 kHz),
+/// réparti sur les bandes les plus proches.
+pub fn from_three([bass, mid, treble]: [f32; 3]) -> Gains {
+    [bass, bass, bass, bass, mid, mid, mid, treble, treble, treble]
+}
+
+/// Gains lus d'un fichier : 10 valeurs, ou 3 d'une ancienne version (converties) ; bornés.
+pub fn gains_from_values(values: &[f32]) -> Option<Gains> {
+    let gains = match values.len() {
+        BANDS => {
+            let mut g = [0.0; BANDS];
+            g.copy_from_slice(values);
+            g
+        }
+        3 => from_three([values[0], values[1], values[2]]),
+        _ => return None,
+    };
+    Some(gains.map(|g| if g.is_finite() { g.clamp(-12.0, 12.0) } else { 0.0 }))
+}
+
+/// Désérialisation tolérante (session.json d'une version à 3 bandes).
+pub fn deserialize_gains<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Gains, D::Error> {
+    let values: Vec<f32> = serde::Deserialize::deserialize(deserializer)?;
+    Ok(gains_from_values(&values).unwrap_or([0.0; BANDS]))
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BiquadCoeffs {
@@ -67,20 +98,20 @@ impl BiquadState {
     }
 }
 
-/// Gains courants en dB des 3 bandes, partagés entre le thread audio et
+/// Gains courants en dB des bandes, partagés entre le thread audio et
 /// les commandes Tauri qui les modifient depuis le frontend.
-pub type EqGains = Arc<Mutex<[f32; 3]>>;
+pub type EqGains = Arc<Mutex<Gains>>;
 
-pub fn new_eq_gains(initial: [f32; 3]) -> EqGains {
+pub fn new_eq_gains(initial: Gains) -> EqGains {
     Arc::new(Mutex::new(initial))
 }
 
-fn compute_all_coeffs(sample_rate: f32, gains: &[f32; 3]) -> [BiquadCoeffs; 3] {
-    [
-        peaking_eq_coeffs(sample_rate, BAND_FREQS[0], Q, gains[0]),
-        peaking_eq_coeffs(sample_rate, BAND_FREQS[1], Q, gains[1]),
-        peaking_eq_coeffs(sample_rate, BAND_FREQS[2], Q, gains[2]),
-    ]
+/// Coefficients des bandes actives (gain non nul, sous la fréquence de Nyquist), dans l'ordre.
+fn compute_active(sample_rate: f32, gains: &Gains) -> Vec<(usize, BiquadCoeffs)> {
+    (0..BANDS)
+        .filter(|&i| gains[i].abs() >= 0.05 && BAND_FREQS[i] < sample_rate * 0.45)
+        .map(|i| (i, peaking_eq_coeffs(sample_rate, BAND_FREQS[i], Q, gains[i])))
+        .collect()
 }
 
 pub struct EqSource<I> {
@@ -88,10 +119,11 @@ pub struct EqSource<I> {
     channels: ChannelCount,
     sample_rate: SampleRate,
     gains: EqGains,
-    cached_gains: [f32; 3],
-    coeffs: [BiquadCoeffs; 3],
+    cached_gains: Gains,
+    /// Bandes actives (numéro de bande, coefficients) : les bandes à 0 dB sont sautées.
+    active: Vec<(usize, BiquadCoeffs)>,
     /// État des filtres par canal (index = numéro de canal) puis par bande.
-    state: Vec<[BiquadState; 3]>,
+    state: Vec<[BiquadState; BANDS]>,
     channel_cursor: usize,
     /// Égaliseur neutre (gains nuls) : les filtres sont sautés, le son est identique et
     /// le processeur du téléphone travaille beaucoup moins.
@@ -102,7 +134,7 @@ pub struct EqSource<I> {
 /// au lieu de prendre un verrou à chaque échantillon.
 const GAIN_CHECK_INTERVAL: usize = 2048;
 
-fn is_flat(gains: &[f32; 3]) -> bool {
+fn is_flat(gains: &Gains) -> bool {
     gains.iter().all(|g| g.abs() < 0.05)
 }
 
@@ -114,15 +146,15 @@ where
         let channels = input.channels();
         let sample_rate = input.sample_rate();
         let cached_gains = *gains.locked();
-        let coeffs = compute_all_coeffs(sample_rate.get() as f32, &cached_gains);
-        let state = vec![[BiquadState::default(); 3]; channels.get() as usize];
+        let active = compute_active(sample_rate.get() as f32, &cached_gains);
+        let state = vec![[BiquadState::default(); BANDS]; channels.get() as usize];
         Self {
             input,
             channels,
             sample_rate,
             gains,
             cached_gains,
-            coeffs,
+            active,
             state,
             channel_cursor: 0,
             flat: is_flat(&cached_gains),
@@ -146,8 +178,7 @@ where
             if let Ok(current) = self.gains.try_lock() {
                 if *current != self.cached_gains {
                     self.cached_gains = *current;
-                    self.coeffs =
-                        compute_all_coeffs(self.sample_rate.get() as f32, &self.cached_gains);
+                    self.active = compute_active(self.sample_rate.get() as f32, &self.cached_gains);
                     self.flat = is_flat(&self.cached_gains);
                 }
             }
@@ -161,8 +192,8 @@ where
 
         let channel_state = &mut self.state[channel];
         let mut out = sample;
-        for (band_state, coeffs) in channel_state.iter_mut().zip(self.coeffs.iter()) {
-            out = band_state.process(out, coeffs);
+        for (band, coeffs) in &self.active {
+            out = channel_state[*band].process(out, coeffs);
         }
         Some(out)
     }
@@ -189,7 +220,7 @@ where
         self.input.try_seek(pos)?;
         self.state
             .iter_mut()
-            .for_each(|s| *s = [BiquadState::default(); 3]);
+            .for_each(|s| *s = [BiquadState::default(); BANDS]);
         self.channel_cursor = 0;
         Ok(())
     }
@@ -261,7 +292,7 @@ mod tests {
     fn eq_source_at_zero_gain_leaves_audio_unchanged() {
         let input = test_signal(200);
         let source = TestSource::new(input.clone(), 44_100, 1);
-        let gains = new_eq_gains([0.0, 0.0, 0.0]);
+        let gains = new_eq_gains([0.0; BANDS]);
         let eq = EqSource::new(source, gains);
         let output: Vec<f32> = eq.collect();
         assert_eq!(output.len(), input.len());
@@ -273,7 +304,7 @@ mod tests {
     #[test]
     fn eq_source_preserves_channel_count_and_sample_rate() {
         let source = TestSource::new(test_signal(16), 48_000, 2);
-        let gains = new_eq_gains([2.0, -3.0, 0.0]);
+        let gains = new_eq_gains(from_three([2.0, -3.0, 0.0]));
         let eq = EqSource::new(source, gains);
         assert_eq!(eq.channels().get(), 2);
         assert_eq!(eq.sample_rate().get(), 48_000);
@@ -283,7 +314,7 @@ mod tests {
     fn boosting_a_band_does_not_produce_nan_or_infinite_output() {
         let input = test_signal(1000);
         let source = TestSource::new(input, 44_100, 1);
-        let gains = new_eq_gains([12.0, 12.0, 12.0]); // boost max
+        let gains = new_eq_gains([12.0; BANDS]); // boost max
         let eq = EqSource::new(source, gains);
         for sample in eq {
             assert!(
@@ -297,7 +328,7 @@ mod tests {
     fn live_gain_change_is_picked_up_without_rebuilding_the_source() {
         let input = test_signal(3 * GAIN_CHECK_INTERVAL);
         let source = TestSource::new(input.clone(), 44_100, 1);
-        let gains = new_eq_gains([0.0, 0.0, 0.0]);
+        let gains = new_eq_gains([0.0; BANDS]);
         let gains_handle = gains.clone();
         let mut eq = EqSource::new(source, gains);
 
@@ -307,7 +338,7 @@ mod tests {
         }
         // ...puis change le gain "en direct" comme le ferait une commande
         // Tauri pendant la lecture.
-        *gains_handle.locked() = [6.0, 0.0, 0.0];
+        *gains_handle.locked() = from_three([6.0, 0.0, 0.0]);
 
         let rest: Vec<f32> = eq.collect();
         assert!(rest.iter().all(|s| s.is_finite()));
@@ -315,5 +346,43 @@ mod tests {
         let tail = &rest[GAIN_CHECK_INTERVAL..];
         let original = &input[50 + GAIN_CHECK_INTERVAL..];
         assert!(tail.iter().zip(original).any(|(a, b)| (a - b).abs() > 1e-4));
+    }
+
+    #[test]
+    fn old_three_band_settings_are_spread_over_ten_bands() {
+        assert_eq!(gains_from_values(&[6.0, -2.0, 3.0]).unwrap(), [6.0, 6.0, 6.0, 6.0, -2.0, -2.0, -2.0, 3.0, 3.0, 3.0]);
+        let ten: Vec<f32> = (0..10).map(|i| i as f32).collect();
+        assert_eq!(gains_from_values(&ten).unwrap()[9], 9.0);
+        assert_eq!(gains_from_values(&[40.0, f32::NAN, -40.0]).unwrap()[0], 12.0);
+        assert_eq!(gains_from_values(&[40.0, f32::NAN, -40.0]).unwrap()[5], 0.0);
+        assert!(gains_from_values(&[1.0, 2.0]).is_none());
+    }
+
+    #[test]
+    fn a_boosted_band_raises_its_own_frequency_much_more_than_a_far_one() {
+        // Sinusoïde pure à 64 Hz puis à 8 kHz, bande de 64 Hz montée de 12 dB.
+        let rms_after = |freq: f32| {
+            let n = 44_100;
+            let input: Vec<f32> = (0..n).map(|i| (2.0 * std::f32::consts::PI * freq * i as f32 / 44_100.0).sin() * 0.25).collect();
+            let mut gains = [0.0; BANDS];
+            gains[1] = 12.0;
+            let out: Vec<f32> = EqSource::new(TestSource::new(input, 44_100, 1), new_eq_gains(gains)).collect();
+            let tail = &out[n / 2..];
+            (tail.iter().map(|s| s * s).sum::<f32>() / tail.len() as f32).sqrt() / (0.25 / 2f32.sqrt())
+        };
+        let low = rms_after(64.0);
+        let high = rms_after(8000.0);
+        assert!(low > 3.5, "64 Hz amplifié d'environ x4 : {low}");
+        assert!((high - 1.0).abs() < 0.05, "8 kHz inchangé : {high}");
+    }
+
+    #[test]
+    fn bands_at_zero_or_above_nyquist_are_skipped() {
+        let mut gains = [0.0; BANDS];
+        gains[5] = 3.0;
+        gains[9] = 6.0;
+        assert_eq!(compute_active(44_100.0, &gains).iter().map(|(b, _)| *b).collect::<Vec<_>>(), vec![5, 9]);
+        // 16 kHz n'est pas sous 0,45 × 22 050 Hz : sautée.
+        assert_eq!(compute_active(22_050.0, &gains).iter().map(|(b, _)| *b).collect::<Vec<_>>(), vec![5]);
     }
 }

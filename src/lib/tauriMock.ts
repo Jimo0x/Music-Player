@@ -125,7 +125,7 @@ export function installTauriMock() {
   let volume = 1;
   let isPaused = true;
   let positionSecs = 0;
-  let eqGains: [number, number, number] = [0, 0, 0];
+  let eqGains: number[] = Array(10).fill(0);
   const dismissedLyrics = new Set<string>();
   const upgraded = new Set<string>();
   let alignModel = false;
