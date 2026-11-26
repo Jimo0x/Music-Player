@@ -53,3 +53,33 @@ describe("thèmes", () => {
     expect(withScheme(neon, false)).toBe(neon);
   });
 });
+
+describe("couleurs avancées (lot 0.12.0)", () => {
+  const base = BUILTIN_THEMES.find((t) => t.id === "ocean")!;
+
+  it("ne changent rien tant qu'aucune n'est choisie", () => {
+    const vars = themeVariables(base);
+    expect(themeVariables({ ...base, colors: { ...base.colors } })).toEqual(vars);
+  });
+
+  it("remplacent seulement les variables choisies", () => {
+    const vars = themeVariables({ ...base, colors: { ...base.colors, sidebar: "#112233", text2: "#abcdef", danger: "#ff0000" } });
+    const auto = themeVariables(base);
+    expect(vars["--bg-sidebar"]).toBe("#112233");
+    expect(vars["--text-2"]).toBe("#abcdef");
+    expect(vars["--danger"]).toBe("#ff0000");
+    expect(vars["--danger-soft"]).toBe("rgba(255, 0, 0, 0.16)");
+    expect(vars["--bar-rgb"]).toBe(auto["--bar-rgb"]);
+    expect(vars["--success"]).toBeUndefined();
+  });
+
+  it("voyagent dans un fichier de thème, vérifiées une à une", () => {
+    const theme = { ...base, colors: { ...base.colors, bar: "#202020", success: "#00ff88" } };
+    const back = parseThemeFile(themeFile(theme))!;
+    expect(back.colors.bar).toBe("#202020");
+    expect(back.colors.success).toBe("#00ff88");
+    const bad = JSON.stringify({ theme: { name: "x", colors: { ...base.colors, sidebar: "rouge", bar: "url(x)" } } });
+    expect(parseThemeFile(bad)!.colors.sidebar).toBeUndefined();
+    expect(parseThemeFile(bad)!.colors.bar).toBeUndefined();
+  });
+});

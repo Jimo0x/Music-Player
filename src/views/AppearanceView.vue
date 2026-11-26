@@ -4,7 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { renderCrop, type Crop } from "@/lib/imageCrop";
 import { catalogFont, SYSTEM_FONT } from "@/lib/fonts";
 import { FONTS } from "@/lib/fontCatalog";
-import { BUILTIN_THEMES, cloneTheme, contrast, parseHex, parseThemeFile, themeFile, type FontRole, type Theme } from "@/lib/themes";
+import { BUILTIN_THEMES, cloneTheme, contrast, parseHex, parseThemeFile, themeFile, themeVariables, type AdvancedColorKey, type FontRole, type Theme } from "@/lib/themes";
 import { useAppearanceStore, type ButtonShape, type ButtonStyle, type FieldShape, type FieldStyle, type IconStyle, type SchemeMode } from "@/stores/appearance";
 import { PATTERNS, patternMask, type PatternId, type PatternSettings } from "@/lib/patterns";
 import type { BackdropSource } from "@/lib/backdrop";
@@ -302,6 +302,31 @@ async function chooseIcon(id: string) {
   ui.notify(ok ? "Icône de l'application changée" : "Ce téléphone n'a pas accepté le changement d'icône");
 }
 
+// Couleurs avancées : facultatives ; « Auto » les rend au calcul à partir des couleurs de base.
+const ADVANCED_FIELDS: { key: AdvancedColorKey; label: string }[] = [
+  { key: "sidebar", label: "Barre latérale" },
+  { key: "bar", label: "Barre du lecteur" },
+  { key: "text2", label: "Texte secondaire" },
+  { key: "success", label: "Réussite" },
+  { key: "danger", label: "Erreur" },
+];
+const advancedOpen = ref(false);
+/** Couleur affichée dans le sélecteur quand rien n'est choisi : celle calculée par le thème. */
+function advancedValue(key: AdvancedColorKey): string {
+  const chosen = current.value.colors[key];
+  if (chosen) return chosen;
+  const vars = themeVariables(current.value);
+  const css = { sidebar: vars["--bg-sidebar"], bar: vars["--bg"], text2: current.value.colors.text, success: "#3cc878", danger: "#ff6b7d" }[key];
+  return /^#[0-9a-f]{6}$/i.test(css ?? "") ? css! : "#808080";
+}
+function resetAdvanced(key: AdvancedColorKey) {
+  const t = current.value;
+  if (t.builtin) return;
+  const colors = { ...t.colors };
+  delete colors[key];
+  appearance.saveTheme({ ...t, colors });
+}
+
 const COLOR_FIELDS: { key: keyof Theme["colors"]; label: string }[] = [
   { key: "bg", label: "Fond" },
   { key: "surface", label: "Surfaces" },
@@ -422,6 +447,20 @@ const VINYL_COLORS: { id: VinylColor; label: string }[] = [
         </label>
       </div>
       <p v-if="readability < 4.5" class="warn">Texte peu lisible sur ce fond (contraste {{ readability.toFixed(1) }} : 4,5 conseillé).</p>
+      <button type="button" class="link advanced-toggle" :aria-expanded="advancedOpen" @click="advancedOpen = !advancedOpen">
+        {{ advancedOpen ? "Masquer les couleurs avancées" : "Couleurs avancées" }}
+      </button>
+      <div v-if="advancedOpen" class="advanced">
+        <p class="muted small">Chaque couleur laissée sur « Auto » est calculée à partir des couleurs ci-dessus.</p>
+        <div class="colors">
+          <div v-for="f in ADVANCED_FIELDS" :key="f.key" class="color">
+            <input type="color" :value="advancedValue(f.key)" :aria-label="f.label" @input="update({}, { [f.key]: ($event.target as HTMLInputElement).value })" />
+            <span>{{ f.label }}</span>
+            <button v-if="current.colors[f.key]" type="button" class="link small" @click="resetAdvanced(f.key)">Remettre en Auto</button>
+            <span v-else class="muted small">Auto</span>
+          </div>
+        </div>
+      </div>
       <label class="slider">
         <span>Arrondi des coins <em>{{ current.radius }} px</em></span>
         <input type="range" min="0" max="20" :value="current.radius" @input="update({ radius: +($event.target as HTMLInputElement).value })" />
@@ -806,6 +845,16 @@ h2 {
 }
 .field input:focus {
   box-shadow: 0 0 0 2px var(--accent);
+}
+.advanced-toggle {
+  display: inline-block;
+  margin: 4px 0 10px;
+}
+.advanced {
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius);
+  background: rgba(var(--fg-rgb), 0.04);
 }
 .colors {
   display: flex;

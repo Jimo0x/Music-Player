@@ -11,7 +11,22 @@ export interface ThemeColors {
   accent: string;
   /** Seconde couleur des halos (facultative, sinon dérivée de l'accent). */
   accent2?: string;
+  // Couleurs avancées (lot 0.12.0), facultatives : sinon déduites des couleurs de base.
+  /** Barre latérale (ordinateur). */
+  sidebar?: string;
+  /** Barre du lecteur et barre du bas (téléphone). */
+  bar?: string;
+  /** Texte secondaire (artistes, durées, aides). */
+  text2?: string;
+  /** Réussite (envoi terminé, morceau ajouté). */
+  success?: string;
+  /** Erreur et suppression. */
+  danger?: string;
 }
+
+/** Couleurs avancées d'un thème, dans l'ordre de l'éditeur. */
+export const ADVANCED_COLOR_KEYS = ["sidebar", "bar", "text2", "success", "danger"] as const;
+export type AdvancedColorKey = (typeof ADVANCED_COLOR_KEYS)[number];
 
 export interface Theme {
   id: string;
@@ -138,12 +153,40 @@ export function themeVariables(theme: Theme): Record<string, string> {
     "--radius-sm": `${Math.round(theme.radius * 0.6)}px`,
     "--glow": glow.toFixed(2),
     "--shadow": light ? "0 10px 30px rgba(40, 30, 20, 0.16)" : "0 10px 30px rgba(0, 0, 0, 0.45)",
+    ...advancedVariables(theme.colors),
     "--home-bg": [
       `radial-gradient(ellipse 70% 50% at 90% -5%, ${rgba(accent, 0.42 * glow)}, transparent 70%)`,
       `radial-gradient(ellipse 55% 45% at 0% 105%, ${rgba(accent2, 0.16 * glow)}, transparent 70%)`,
       `linear-gradient(165deg, ${hex(mix(bg, accent, light ? 0.06 : 0.12))} 0%, ${hex(bg)} 45%, ${hex(mix(bg, black, light ? 0.02 : 0.35))} 100%)`,
     ].join(", "),
   };
+}
+
+/** Variables des couleurs avancées choisies (les autres restent celles déduites). */
+function advancedVariables(colors: ThemeColors): Record<string, string> {
+  const vars: Record<string, string> = {};
+  const sidebar = parseHex(colors.sidebar ?? "");
+  if (sidebar) vars["--bg-sidebar"] = hex(sidebar);
+  const bar = parseHex(colors.bar ?? "");
+  if (bar) vars["--bar-rgb"] = channels(bar);
+  const text2 = parseHex(colors.text2 ?? "");
+  if (text2) {
+    vars["--text-2"] = hex(text2);
+    vars["--text-3"] = rgba(text2, 0.7);
+  }
+  const success = parseHex(colors.success ?? "");
+  if (success) {
+    vars["--success"] = hex(success);
+    vars["--success-soft"] = rgba(success, 0.18);
+  }
+  const danger = parseHex(colors.danger ?? "");
+  if (danger) {
+    vars["--danger"] = hex(danger);
+    vars["--danger-text"] = hex(danger);
+    vars["--danger-soft"] = rgba(danger, 0.16);
+    vars["--danger-strong"] = hex(danger);
+  }
+  return vars;
 }
 
 /** Accent éclairci ou foncé jusqu'à rester lisible sur le fond (contraste minimal). */
@@ -209,6 +252,11 @@ export function parseThemeFile(source: string): Theme | null {
   const color = (v: unknown) => (typeof v === "string" && parseHex(v) ? v : null);
   const [bg, surface, text, accent] = [color(c.bg), color(c.surface), color(c.text), color(c.accent)];
   if (!bg || !surface || !text || !accent) return null;
+  const advanced: Partial<Record<AdvancedColorKey, string>> = {};
+  for (const key of ADVANCED_COLOR_KEYS) {
+    const value = color(c[key]);
+    if (value) advanced[key] = value;
+  }
   const num = (v: unknown, lo: number, hi: number, d: number) =>
     typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d;
   const fonts: Partial<Record<FontRole, string>> = {};
@@ -221,7 +269,7 @@ export function parseThemeFile(source: string): Theme | null {
   return {
     id: `perso-${Date.now().toString(36)}`,
     name: typeof o.name === "string" && o.name.trim() ? o.name.trim().slice(0, 40) : "Thème importé",
-    colors: { bg, surface, text, accent, accent2: color(c.accent2) ?? undefined },
+    colors: { bg, surface, text, accent, accent2: color(c.accent2) ?? undefined, ...advanced },
     radius: num(o.radius, 0, 20, 10),
     glow: num(o.glow, 0, 1, 0.8),
     fonts: Object.keys(fonts).length ? fonts : undefined,
