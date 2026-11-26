@@ -7,6 +7,7 @@ import { useUiStore } from "@/stores/ui";
 import Icon from "@/components/Icon.vue";
 import FriendAvatar from "@/components/FriendAvatar.vue";
 import { useFriendsStore } from "@/stores/friends";
+import { useBaladeurStore } from "@/stores/baladeur";
 import TrackRow from "@/components/TrackRow.vue";
 import { type SharedTrack, useShareStore } from "@/stores/share";
 import type { Track } from "@/lib/types";
@@ -16,6 +17,7 @@ const player = usePlayerStore();
 const ui = useUiStore();
 const friends = useFriendsStore();
 const share = useShareStore();
+const baladeur = useBaladeurStore();
 
 // Les vrais ajouts récents, piste par piste : un album bucketé par sa piste la plus
 // récente montrait tout un album ancien dès qu'un seul morceau y était ajouté ou retouché.
@@ -45,6 +47,19 @@ function play(index: number) {
   <div class="page">
     <h1 class="page-title">Ajouts récents</h1>
     <RecapBanner />
+    <!-- Accès rapides (téléphone, lot 0.13.0) : ce qui ne s'atteignait que par les Réglages. -->
+    <div v-if="ui.isMobile" class="quick">
+      <button type="button" class="quick-tile" @click="ui.go({ name: 'download' })">
+        <Icon name="import" :size="22" />
+        <strong>Télécharger</strong>
+        <small>Un lien ou une recherche</small>
+      </button>
+      <button type="button" class="quick-tile" @click="baladeur.enabled = true">
+        <Icon name="phone" :size="22" />
+        <strong>Mode baladeur</strong>
+        <small>Molette et petit écran</small>
+      </button>
+    </div>
     <div v-if="friends.listening.length" class="friends-strip">
       <button v-for="x in friends.listening.slice(0, 8)" :key="x.friend.code" type="button" class="friend-chip" @click="ui.go({ name: 'friends' })">
         <FriendAvatar :name="x.friend.name" :src="x.friend.avatar" :size="34" :live="x.status.playing" />
@@ -163,6 +178,44 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.quick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.quick-tile {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  padding: 14px;
+  border: 0;
+  border-radius: var(--radius);
+  background: linear-gradient(140deg, color-mix(in srgb, var(--accent) 22%, transparent), rgba(var(--fg-rgb), 0.04));
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  transition: transform 0.15s ease;
+}
+.quick-tile > :first-child {
+  margin-bottom: 4px;
+  color: var(--accent);
+}
+.quick-tile strong {
+  font-size: 14px;
+}
+.quick-tile small {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.quick-tile:active {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .quick-tile {
+    transition: none;
+  }
 }
 .voices-link {
   display: flex;
