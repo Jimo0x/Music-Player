@@ -14,6 +14,7 @@ export interface TourCard {
 }
 
 const TOPICS: { test: RegExp; icon: string; route: Route | null }[] = [
+  { test: /immersi|8D|acoustique|ambiance/i, icon: "orbit", route: { name: "settings", section: "mode-immersif" } },
   { test: /égaliseur/i, icon: "eq", route: { name: "settings" } },
   { test: /sortie audio/i, icon: "volume", route: { name: "settings" } },
   { test: /barre de progression|forme d'onde|vague/i, icon: "play", route: { name: "appearance" } },

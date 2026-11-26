@@ -10,6 +10,12 @@ describe("« Quoi de neuf ? » en cartes", () => {
     expect(d.route).toEqual({ name: "appearance" });
   });
 
+  it("les nouveautés du mode immersif mènent à sa section des Réglages", () => {
+    const c = toCard("0.14.0", "Acoustique de salle : écoutez comme dans une cathédrale.");
+    expect(c).toMatchObject({ icon: "orbit", route: { name: "settings", section: "mode-immersif" } });
+    expect(toCard("0.14.0", "Ambiance par playlist : sa propre ambiance.").route).toEqual({ name: "settings", section: "mode-immersif" });
+  });
+
   it("une nouveauté sans titre ni sujet reconnu reste une carte simple", () => {
     const c = toCard("0.9.0", "Les sons Dolby se lisent maintenant partout.");
     expect(c.title).toBe("Nouveauté");

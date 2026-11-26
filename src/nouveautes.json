@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.14.0",
+    "date": "2026-11-26",
+    "items": [
+      "Mode immersif : la musique tourne autour de votre tête (effet 8D), à la vitesse et dans le sens de votre choix. Au casque, c'est saisissant. À retrouver dans les Réglages et sur l'écran « À l'écoute ».",
+      "Mode immersif : deux façons de placer le son autour de vous, une tête simplifiée très légère pour les petits téléphones, ou une vraie tête mesurée qui distingue mieux devant et derrière.",
+      "Acoustique de salle : écoutez comme dans un studio, une chambre, un club, une salle de concert, une cathédrale ou une arène, avec la taille et la résonance à votre goût.",
+      "Ambiance par playlist : donnez à une playlist sa propre ambiance (8D, salle) ; elle s'applique quand vous la lancez, puis vos réglages habituels reviennent."
+    ]
+  },
+  {
     "version": "0.13.0",
     "date": "2026-11-26",
     "items": [

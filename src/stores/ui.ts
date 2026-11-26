@@ -17,7 +17,8 @@ export type Route =
   | { name: "playlist"; id: string }
   | { name: "search"; query: string }
   | { name: "playlists" }
-  | { name: "settings" }
+  /** `section` : identifiant d'une section à faire défiler jusqu'à l'écran (« Essayer » de Quoi de neuf). */
+  | { name: "settings"; section?: string }
   | { name: "appearance" }
   | { name: "profile" }
   | { name: "devices" }

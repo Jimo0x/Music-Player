@@ -32,6 +32,11 @@ const ui = useUiStore();
 
 const modelMo = computed(() => Math.round((lyrics.model?.bytes ?? 80_500_000) / 1_000_000));
 onMounted(() => void lyrics.refreshModel());
+// Ouvert sur une section précise (« Essayer » d'une nouveauté) : on y descend.
+onMounted(() => {
+  const section = ui.route.name === "settings" ? ui.route.section : undefined;
+  if (section) requestAnimationFrame(() => document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+});
 async function toggleAlign(on: boolean) {
   if (on) await lyrics.enableAlign();
   else lyrics.disableAlign();
