@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.13.0",
+    "date": "2026-11-26",
+    "items": [
+      "Égaliseur : 10 bandes au lieu de 3, une courbe à façonner du doigt avec la musique qui danse derrière, 13 préréglages, et un bouton à maintenir pour comparer avec et sans. Vos réglages actuels sont gardés.",
+      "Barre de progression : choisissez son style sur l'écran « À l'écoute » (vague qui ondule, vraie forme d'onde du morceau, perles, néon, segments…) dans Personnalisation.",
+      "Sortie audio : sur ordinateur, choisissez où passe le son (casque, enceintes, écran) ; le morceau reprend au même endroit.",
+      "Quoi de neuf : les nouveautés se découvrent une à une, avec un bouton pour les essayer tout de suite.",
+      "Téléphone : Télécharger et le mode baladeur sont directement sur l'accueil."
+    ]
+  },
+  {
     "version": "0.12.0",
     "date": "2026-11-26",
     "items": [
