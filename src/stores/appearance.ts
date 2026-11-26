@@ -5,6 +5,7 @@ import { ensureFont, fontStack, SYSTEM_FONT, type CustomFont } from "@/lib/fonts
 import { BUILTIN_THEMES, DEFAULT_THEME_ID, isLight, themeVariables, withScheme, type FontRole, type Theme } from "@/lib/themes";
 import { defaultBackdrop, normalizeBackdrop, prepareBackdropImage, type BackdropSettings, type BackdropSource } from "@/lib/backdrop";
 import { defaultPattern, normalizePattern, type PatternSettings } from "@/lib/patterns";
+import { iconNameOf, normalizeIcons, sanitizeSvg, setCustomIcons, type CustomIcon } from "@/lib/iconPack";
 
 // Personnalisation de l'application : thème et mode clair / sombre, polices, boutons et
 // champs, icônes, profil, icône de l'application. Enregistrée côté Rust (appearance.json,
@@ -41,6 +42,8 @@ export interface AppearanceSettings {
   backdrop: BackdropSettings;
   /** Motif posé sur le fond (lot 0.12.0). */
   pattern: PatternSettings;
+  /** Jeu d'icônes importé, par nom d'icône (lot 0.12.0). */
+  customIcons: Record<string, CustomIcon>;
 }
 
 const CACHE_KEY = "mp:appearance-vars";
@@ -63,6 +66,7 @@ export function defaultAppearance(): AppearanceSettings {
     appIconImage: null,
     backdrop: defaultBackdrop(),
     pattern: defaultPattern(),
+    customIcons: {},
   };
 }
 
@@ -103,6 +107,7 @@ function normalize(raw: unknown): AppearanceSettings {
     appIconImage: str(o.appIconImage),
     backdrop: normalizeBackdrop(o.backdrop),
     pattern: normalizePattern(o.pattern),
+    customIcons: normalizeIcons(o.customIcons),
   };
 }
 
@@ -217,6 +222,7 @@ export const useAppearanceStore = defineStore("appearance", {
       if (s.fonts.lyrics !== SYSTEM_FONT) vars["--font-lyrics"] = fontStack(s.fonts.lyrics, "display");
       if (s.lyricsScale !== 1) vars["--lyrics-scale"] = s.lyricsScale.toFixed(2);
       for (const id of Object.values(s.fonts)) void this.loadFont(id);
+      setCustomIcons(s.customIcons);
       const applied: Applied = {
         vars,
         light: this.light,
@@ -353,6 +359,31 @@ export const useAppearanceStore = defineStore("appearance", {
       this.changed();
       await this.applyWindowIcon(true);
       return true;
+    },
+    /** Fichiers SVG choisis : ceux qui portent le nom d'une icône de l'appli la remplacent. */
+    async importIcons(files: File[]): Promise<{ added: string[]; ignored: string[] }> {
+      const added: string[] = [];
+      const ignored: string[] = [];
+      const icons = { ...this.settings.customIcons };
+      for (const file of files) {
+        const name = iconNameOf(file.name);
+        const icon = name && file.size <= 64 * 1024 ? sanitizeSvg(await file.text()) : null;
+        if (name && icon) {
+          icons[name] = icon;
+          added.push(name);
+        } else {
+          ignored.push(file.name);
+        }
+      }
+      if (added.length) {
+        this.settings.customIcons = icons;
+        this.changed();
+      }
+      return { added, ignored };
+    },
+    clearIcons() {
+      this.settings.customIcons = {};
+      this.changed();
     },
     setBackdropSource(source: BackdropSource) {
       if (source === "image" && !this.settings.backdrop.image) return;

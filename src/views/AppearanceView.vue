@@ -6,6 +6,7 @@ import { catalogFont, SYSTEM_FONT } from "@/lib/fonts";
 import { FONTS } from "@/lib/fontCatalog";
 import { BUILTIN_THEMES, cloneTheme, contrast, parseHex, parseThemeFile, themeFile, themeVariables, type AdvancedColorKey, type FontRole, type Theme } from "@/lib/themes";
 import { useAppearanceStore, type ButtonShape, type ButtonStyle, type FieldShape, type FieldStyle, type IconStyle, type SchemeMode } from "@/stores/appearance";
+import { ICON_NAMES } from "@/lib/iconPack";
 import { PATTERNS, patternMask, type PatternId, type PatternSettings } from "@/lib/patterns";
 import type { BackdropSource } from "@/lib/backdrop";
 import { useUiStore } from "@/stores/ui";
@@ -158,6 +159,31 @@ const ICON_STYLES: { id: IconStyle; label: string; vars: Record<string, string> 
   { id: "duo", label: "Deux tons", vars: { "--icon-fill": "currentColor", "--icon-fill-opacity": "0.22" } },
 ];
 const SAMPLE_ICONS = ["shuffle", "repeat", "lyrics", "queue", "playlist", "settings"];
+
+// ---- Jeu d'icônes importé (lot 0.12.0) ----
+const iconsInput = ref<HTMLInputElement | null>(null);
+const showIconNames = ref(false);
+const customIconCount = computed(() => Object.keys(s.value.customIcons).length);
+async function onIconFiles(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = [...(input.files ?? [])];
+  input.value = "";
+  if (!files.length) return;
+  const { added, ignored } = await appearance.importIcons(files);
+  if (!added.length) {
+    ui.notify("Aucune icône reconnue : chaque fichier doit porter le nom d'une icône de l'appli (play.svg, playlist.svg…).");
+  } else {
+    ui.notify(`${added.length} icône${added.length > 1 ? "s" : ""} remplacée${added.length > 1 ? "s" : ""}${ignored.length ? ` · ${ignored.length} fichier${ignored.length > 1 ? "s" : ""} ignoré${ignored.length > 1 ? "s" : ""}` : ""}`);
+  }
+}
+async function copyIconNames() {
+  try {
+    await navigator.clipboard.writeText(ICON_NAMES.join("\n"));
+    ui.notify("Liste des noms copiée");
+  } catch {
+    ui.notify("Copie impossible");
+  }
+}
 
 function setButtons(patch: Partial<typeof s.value.buttons>) {
   appearance.settings.buttons = { ...s.value.buttons, ...patch };
@@ -619,6 +645,22 @@ const VINYL_COLORS: { id: VinylColor; label: string }[] = [
           <span class="icon-label">{{ o.label }}</span>
         </button>
       </div>
+      <h3 class="sub">Mon jeu d'icônes</h3>
+      <p class="muted small">
+        Importez des fichiers SVG nommés comme les icônes de l'appli (play.svg, pause.svg, playlist.svg…) : chacun remplace l'icône du même nom, les autres restent.
+        Les couleurs suivent le thème ; tout ce qui n'est pas un dessin (scripts, styles, liens, images) est retiré.
+      </p>
+      <p v-if="customIconCount" class="small">{{ customIconCount }} icône{{ customIconCount > 1 ? "s" : "" }} remplacée{{ customIconCount > 1 ? "s" : "" }} sur {{ ICON_NAMES.length }}.</p>
+      <div class="row">
+        <button type="button" class="pill pill-ghost" @click="iconsInput?.click()"><Icon name="import" :size="15" /> Importer des icônes (.svg)</button>
+        <button v-if="customIconCount" type="button" class="pill pill-ghost danger" @click="appearance.clearIcons()">Revenir aux icônes d'origine</button>
+        <button type="button" class="link" :aria-expanded="showIconNames" @click="showIconNames = !showIconNames">{{ showIconNames ? "Masquer les noms" : "Voir les noms des icônes" }}</button>
+      </div>
+      <div v-if="showIconNames" class="icon-names">
+        <span v-for="n in ICON_NAMES" :key="n" class="icon-name" :class="{ mine: s.customIcons[n] }"><Icon :name="n" :size="16" /> {{ n }}</span>
+        <button type="button" class="link small" @click="copyIconNames">Copier la liste</button>
+      </div>
+      <input ref="iconsInput" type="file" accept=".svg,image/svg+xml" multiple hidden @change="onIconFiles" />
     </section>
 
     <section class="card">
@@ -1118,6 +1160,31 @@ h2 {
 }
 .profile-fields .field {
   margin: 0;
+}
+.sub {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 14px;
+}
+.icon-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-3);
+}
+.icon-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(var(--fg-rgb), 0.05);
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  user-select: text;
+}
+.icon-name.mine {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 .patterns {
   display: grid;
