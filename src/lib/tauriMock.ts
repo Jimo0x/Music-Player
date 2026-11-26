@@ -126,6 +126,7 @@ export function installTauriMock() {
   let isPaused = true;
   let positionSecs = 0;
   let eqGains: number[] = Array(10).fill(0);
+  let mockOutput: string | null = null;
   const dismissedLyrics = new Set<string>();
   const upgraded = new Set<string>();
   let alignModel = false;
@@ -416,6 +417,10 @@ export function installTauriMock() {
         const swell = 0.55 + 0.45 * Math.sin((i / 160) * Math.PI * 3);
         return Math.round(10 + 245 * Math.min(1, swell * (0.6 + 0.4 * (seed / 233280))));
       });
+    },
+    list_output_devices: () => ({ devices: ["Haut-parleurs (Realtek Audio)", "Casque (WH-1000XM4)", "NVIDIA High Definition Audio (HDMI)"], chosen: mockOutput }),
+    set_output_device: ({ name }) => {
+      mockOutput = (name as string | null) ?? null;
     },
     read_asset: async ({ name }) => {
       const url = assets.get(String(name));

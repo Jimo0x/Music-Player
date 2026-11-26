@@ -20,6 +20,9 @@ pub struct SessionState {
     /// 3 bandes [basses, médiums, aigus] est convertie à la lecture.
     #[serde(default, deserialize_with = "crate::eq::deserialize_gains")]
     pub eq_gains: crate::eq::Gains,
+    /// Sortie audio choisie (nom du périphérique), `None` : celle du système.
+    #[serde(default)]
+    pub output_device: Option<String>,
 }
 
 impl Default for SessionState {
@@ -33,6 +36,7 @@ impl Default for SessionState {
             shuffle: false,
             repeat: RepeatMode::Off,
             eq_gains: [0.0; crate::eq::BANDS],
+            output_device: None,
         }
     }
 }
@@ -133,6 +137,7 @@ mod tests {
             shuffle: true,
             repeat: RepeatMode::All,
             eq_gains: crate::eq::from_three([3.0, -2.0, 1.5]),
+            output_device: Some("Casque (USB)".to_string()),
         };
         state.save(&path).unwrap();
 
@@ -144,6 +149,7 @@ mod tests {
         assert_eq!(reloaded.volume, state.volume);
         assert_eq!(reloaded.shuffle, state.shuffle);
         assert_eq!(reloaded.repeat, state.repeat);
+        assert_eq!(reloaded.output_device, state.output_device);
         assert_eq!(reloaded.eq_gains, state.eq_gains);
     }
 

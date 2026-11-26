@@ -208,6 +208,8 @@ pub fn run() {
             commands::delete_asset,
             commands::read_asset,
             commands::track_waveform,
+            commands::list_output_devices,
+            commands::set_output_device,
             commands::add_to_playlist,
             commands::add_tracks_to_playlist,
             commands::remove_from_playlist,

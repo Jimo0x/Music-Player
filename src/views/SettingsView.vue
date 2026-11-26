@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { openDefaultApps } from "@/lib/androidMedia";
 import { formatCollection } from "@/lib/format";
 import Equalizer from "@/components/Equalizer.vue";
+import OutputDevices from "@/components/OutputDevices.vue";
 import { useLibraryStore } from "@/stores/library";
 import { useLyricsStore } from "@/stores/lyrics";
 import { usePlaylistsStore } from "@/stores/playlists";
@@ -294,6 +295,11 @@ const shortcuts = [
           <button v-if="lite && autoReason.startsWith('saccades')" type="button" class="link-btn" @click="resetDetection()">Réessayer le mode complet</button>
         </template>
       </p>
+    </section>
+
+    <section v-if="!onAndroid" class="section-card">
+      <h2><Icon name="volume" :size="17" /> Sortie audio</h2>
+      <OutputDevices />
     </section>
 
     <section class="section-card">

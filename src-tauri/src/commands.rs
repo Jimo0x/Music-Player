@@ -1678,6 +1678,25 @@ pub fn set_eq_gains(state: State<AppState>, gains: Vec<f32>) -> Result<(), Strin
     Ok(())
 }
 
+/// Sorties audio du système et celle choisie (`None` : celle du système).
+#[derive(Debug, Serialize)]
+pub struct OutputDevices {
+    pub devices: Vec<String>,
+    pub chosen: Option<String>,
+}
+
+#[tauri::command(async)]
+pub fn list_output_devices() -> OutputDevices {
+    OutputDevices { devices: crate::audio::output_devices(), chosen: crate::audio::output_choice() }
+}
+
+/// Change de sortie audio (le morceau reprend au même endroit) et la retient.
+#[tauri::command]
+pub fn set_output_device(state: State<AppState>, name: Option<String>) -> Result<(), String> {
+    crate::audio::set_output_choice(name, true);
+    persist_session(&state).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn get_eq_gains(state: State<AppState>) -> crate::eq::Gains {
     *state.eq_gains.locked()
@@ -1762,6 +1781,7 @@ pub fn persist_session(state: &State<AppState>) -> std::io::Result<()> {
         shuffle: queue.shuffle_enabled(),
         repeat: queue.repeat(),
         eq_gains: *state.eq_gains.locked(),
+        output_device: crate::audio::output_choice(),
     };
     session.save(&state.session_path())
 }
@@ -1781,6 +1801,7 @@ pub fn restore_state(state: &AppState, data_dir: &Path) -> Option<String> {
     let session = SessionState::load(&PathBuf::from(data_dir).join("session.json"));
     *state.volume.locked() = session.volume;
     *state.eq_gains.locked() = session.eq_gains;
+    crate::audio::set_output_choice(session.output_device.clone(), session.output_device.is_some());
 
     if let Some(root) = &session.library_root {
         let cached = library::load_cache(&state.library_cache_path(), root).unwrap_or_default();

@@ -124,6 +124,10 @@ export const api = {
   readAsset: (name: string) => invoke<string>("read_asset", { name }),
   /** Forme d'onde d'un morceau (160 barres de 0 à 255), calculée une fois puis gardée. */
   trackWaveform: (trackId: string) => invoke<number[]>("track_waveform", { trackId }),
+  /** Sorties audio du système et celle choisie (ordinateur). */
+  listOutputDevices: () => invoke<{ devices: string[]; chosen: string | null }>("list_output_devices"),
+  /** Change de sortie audio (null : celle du système) ; le morceau reprend au même endroit. */
+  setOutputDevice: (name: string | null) => invoke<void>("set_output_device", { name }),
   deletePlaylist: (id: string) => invoke<void>("delete_playlist", { id }),
   renamePlaylist: (id: string, name: string) => invoke<void>("rename_playlist", { id, name }),
   addToPlaylist: (playlistId: string, trackId: string) =>

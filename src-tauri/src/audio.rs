@@ -23,6 +23,50 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+// Sortie audio choisie (lot 0.13.0) : son nom, ou `None` pour celle du système. Changer de
+// sortie demande au fil audio de rouvrir le flux (comme après un casque débranché) : le
+// morceau reprend au même endroit. Sortie choisie introuvable : celle du système.
+static OUTPUT_CHOICE: Mutex<Option<String>> = Mutex::new(None);
+static SWITCH_OUTPUT: AtomicBool = AtomicBool::new(false);
+
+pub fn output_choice() -> Option<String> {
+    OUTPUT_CHOICE.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+/// Retient la sortie choisie ; `switch_now` : rouvrir le flux tout de suite.
+pub fn set_output_choice(name: Option<String>, switch_now: bool) {
+    *OUTPUT_CHOICE.lock().unwrap_or_else(|e| e.into_inner()) = name.filter(|n| !n.trim().is_empty());
+    if switch_now {
+        SWITCH_OUTPUT.store(true, Ordering::SeqCst);
+    }
+}
+
+/// Noms des sorties audio du système (la première est celle par défaut, si connue).
+pub fn output_devices() -> Vec<String> {
+    use rodio::cpal::traits::{DeviceTrait, HostTrait};
+    let host = rodio::cpal::default_host();
+    let default = host.default_output_device().and_then(|d| d.description().ok()).map(|d| d.name().to_string());
+    let mut names: Vec<String> = host
+        .output_devices()
+        .map(|devices| devices.filter_map(|d| d.description().ok().map(|desc| desc.name().to_string())).collect())
+        .unwrap_or_default();
+    names.dedup();
+    if let Some(default) = default {
+        names.retain(|n| *n != default);
+        names.insert(0, default);
+    }
+    names
+}
+
+/// Périphérique de sortie portant ce nom, s'il est branché.
+fn device_named(name: &str) -> Option<rodio::cpal::Device> {
+    use rodio::cpal::traits::{DeviceTrait, HostTrait};
+    rodio::cpal::default_host()
+        .output_devices()
+        .ok()?
+        .find(|d| d.description().is_ok_and(|desc| desc.name() == name))
+}
+
 #[derive(Debug)]
 enum AudioCommand {
     Play(String, f32, Option<Sender<Result<(), String>>>),
@@ -398,6 +442,18 @@ fn open_output(lost: &Arc<AtomicBool>) -> Result<rodio::MixerDeviceSink, String>
     };
 
     let mut errors = Vec::new();
+    // Sortie choisie par la personne, si elle est branchée ; sinon, celle du système.
+    if let Some(device) = output_choice().as_deref().and_then(device_named) {
+        let on_error = on_error.clone();
+        let chosen = panic::catch_unwind(AssertUnwindSafe(move || {
+            DeviceSinkBuilder::from_device(device).and_then(|b| b.with_error_callback(on_error).open_sink_or_fallback())
+        }));
+        match chosen {
+            Ok(Ok(device)) => return Ok(device),
+            Ok(Err(e)) => errors.push(e.to_string()),
+            Err(p) => errors.push(panic_text(p)),
+        }
+    }
     let preferred = {
         let on_error = on_error.clone();
         panic::catch_unwind(AssertUnwindSafe(move || {
@@ -587,9 +643,12 @@ fn audio_thread_main(
 
         // Flux coupé par le système, ou lecture figée depuis 2 s : l'ancienne sortie est
         // libérée et l'endroit où reprendre retenu…
-        let lost = engine
-            .as_ref()
-            .is_some_and(|e| e.lost.load(Ordering::SeqCst));
+        // Autre sortie choisie : traitée comme un flux perdu (rouverte, morceau repris).
+        let switch = SWITCH_OUTPUT.swap(false, Ordering::SeqCst);
+        let lost = switch
+            || engine
+                .as_ref()
+                .is_some_and(|e| e.lost.load(Ordering::SeqCst));
         let stalled = watch
             .stalled_since
             .is_some_and(|t| t.elapsed() > Duration::from_secs(2));
