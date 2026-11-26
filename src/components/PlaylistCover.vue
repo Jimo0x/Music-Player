@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, ref, watch } from "vue";
+import { coverUrl } from "@/lib/covers";
+import { PATTERNS, patternMask, type PatternId } from "@/lib/patterns";
 import { themeFor, titleScale } from "@/lib/playlistThemes";
-import type { PlaylistStyle } from "@/lib/types";
+import type { PlaylistStyle, Track } from "@/lib/types";
 import { useAppearanceStore } from "@/stores/appearance";
+import { useLibraryStore } from "@/stores/library";
 
 // Jaquette d'une playlist : dégradé du thème choisi (motif au choix) ou image de
 // l'utilisateur recadrée, et le nom de la playlist dans la police, la couleur, la taille et
@@ -17,8 +20,10 @@ const props = withDefaults(
     imageUrl?: string | null;
     radius?: number;
     mini?: boolean;
+    /** Morceaux de la playlist (jaquette faite de leurs pochettes). */
+    trackIds?: string[] | null;
   }>(),
-  { theme: null, styling: null, imageUrl: null, radius: 10, mini: false },
+  { theme: null, styling: null, imageUrl: null, radius: 10, mini: false, trackIds: null },
 );
 
 const appearance = useAppearanceStore();
@@ -26,7 +31,50 @@ const t = computed(() => themeFor(props.theme));
 const st = computed<PlaylistStyle>(() => props.styling ?? {});
 const scale = computed(() => titleScale(props.name) * (st.value.size ?? 1));
 const initial = computed(() => props.name.trim().charAt(0).toUpperCase() || "♪");
-const image = computed(() => props.imageUrl ?? (st.value.image ? appearance.assetUrl(st.value.image) : null));
+const library = useLibraryStore();
+const userImage = computed(() => props.imageUrl ?? (st.value.image ? appearance.assetUrl(st.value.image) : null));
+
+// Pochettes de la playlist (lot 0.12.0) : les premiers albums différents qui ont une pochette.
+const art = ref<string[]>([]);
+watch(
+  () => [st.value.artwork ?? null, (props.trackIds ?? []).slice(0, 200).join("|")] as const,
+  async ([mode]) => {
+    if (!mode || !props.trackIds?.length) {
+      art.value = [];
+      return;
+    }
+    const want = mode === "mosaic" ? 4 : 1;
+    const seen = new Set<string>();
+    const picked: Track[] = [];
+    for (const id of props.trackIds) {
+      const t = library.byId(id);
+      if (!t?.has_cover) continue;
+      const album = `${t.album_artist || t.artist}\u0000${t.album || t.title}`.toLowerCase();
+      if (seen.has(album)) continue;
+      seen.add(album);
+      picked.push(t);
+      if (picked.length >= want) break;
+    }
+    const urls = (await Promise.all(picked.map((t) => coverUrl(t)))).filter((u): u is string => !!u);
+    // Mosaïque de moins de quatre albums : une seule pochette, plus lisible qu'une grille à trous.
+    art.value = mode === "mosaic" && urls.length < 4 ? urls.slice(0, 1) : urls;
+  },
+  { immediate: true },
+);
+const image = computed(() => userImage.value ?? (art.value.length === 1 ? art.value[0] : null));
+const mosaic = computed(() => (!userImage.value && art.value.length === 4 ? art.value : null));
+
+// Motifs dessinés par les tuiles du fond de l'appli (losanges, hexagones, grain).
+const MASKED = new Set<string>(["diamonds", "hexagons", "grain"]);
+const motifStyle = computed(() => {
+  const id = st.value.pattern ?? "rings";
+  if (!MASKED.has(id)) return undefined;
+  const def = PATTERNS.find((x) => x.id === id);
+  const mask = patternMask(id as PatternId);
+  if (!def || !mask) return undefined;
+  const size = `${(def.w * 0.4).toFixed(1)}cqw ${(def.h * 0.4).toFixed(1)}cqw`;
+  return { background: "rgba(255, 255, 255, 0.4)", maskImage: mask.image, WebkitMaskImage: mask.image, maskSize: size, WebkitMaskSize: size, maskRepeat: "repeat", WebkitMaskRepeat: "repeat" };
+});
 const pattern = computed(() => st.value.pattern ?? "rings");
 const showName = computed(() => st.value.showName !== false);
 const ink = computed(() => st.value.ink || (image.value ? "#fff" : t.value.ink));
@@ -56,19 +104,25 @@ const photoStyle = computed(() => {
 <template>
   <div
     class="pl-cover"
-    :class="[{ mini, photo: !!image }, `pat-${pattern}`, `place-${st.place ?? 'bottom'}`]"
-    :style="{ background: image ? '#111' : t.background, color: ink, borderRadius: `${radius}px`, '--glow': t.glow, '--fs': `${scale}cqw`, '--dim': st.dim ?? 0.35 }"
+    :class="[{ mini, photo: !!image || !!mosaic }, `pat-${pattern}`, `place-${st.place ?? 'bottom'}`]"
+    :style="{ background: image || mosaic ? '#111' : t.background, color: ink, borderRadius: `${radius}px`, '--glow': t.glow, '--fs': `${scale}cqw`, '--dim': st.dim ?? 0.35 }"
     role="img"
     :aria-label="`Jaquette de la playlist ${name}`"
   >
-    <template v-if="image">
-      <img class="photo-img" :src="image" alt="" draggable="false" :style="photoStyle" />
+    <template v-if="mosaic">
+      <span class="mosaic">
+        <img v-for="(src, i) in mosaic" :key="i" :src="src" alt="" draggable="false" />
+      </span>
+      <span v-if="showName && !mini" class="shade" />
+    </template>
+    <template v-else-if="image">
+      <img class="photo-img" :src="image" alt="" draggable="false" :style="userImage ? photoStyle : undefined" />
       <span v-if="showName && !mini" class="shade" />
     </template>
     <template v-else>
       <span v-if="pattern === 'rings'" class="orb o1" />
       <span v-if="pattern === 'rings'" class="orb o2" />
-      <span class="motif" />
+      <span class="motif" :style="motifStyle" />
     </template>
     <template v-if="mini">
       <span v-if="!image" class="initial" :style="nameStyle">{{ initial }}</span>
@@ -153,6 +207,19 @@ const photoStyle = computed(() => {
   left: 0;
   z-index: -1;
   mix-blend-mode: soft-light;
+}
+.mosaic {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.mosaic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .pat-rings .motif {
   background: repeating-radial-gradient(circle at 100% 0%, transparent 0 7cqw, rgba(255, 255, 255, 0.07) 7cqw 7.4cqw);

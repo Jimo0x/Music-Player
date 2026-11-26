@@ -22,6 +22,8 @@ const name = ref("");
 const theme = ref(DEFAULT_THEME);
 const customColor = ref("#7b5cff");
 const style = ref<PlaylistStyle>({});
+/** Morceaux de la playlist modifiée, pour une jaquette faite de leurs pochettes. */
+const trackIds = ref<string[]>([]);
 /** Image choisie mais pas encore enregistrée. */
 const pending = ref<{ blob: Blob; url: string; ext: string } | null>(null);
 const saving = ref(false);
@@ -42,6 +44,9 @@ const PATTERNS: { id: NonNullable<PlaylistStyle["pattern"]>; label: string }[] =
   { id: "grid", label: "Grille" },
   { id: "waves", label: "Vagues" },
   { id: "stars", label: "Étoiles" },
+  { id: "diamonds", label: "Losanges" },
+  { id: "hexagons", label: "Hexagones" },
+  { id: "grain", label: "Grain" },
 ];
 
 function dropPending() {
@@ -60,7 +65,9 @@ watch(
       name.value = p?.name ?? "";
       theme.value = p?.theme ?? DEFAULT_THEME;
       style.value = { ...(p?.style ?? {}) };
+      trackIds.value = p?.track_ids ?? [];
     } else {
+      trackIds.value = [];
       name.value = "";
       // Un thème différent à chaque création, pour varier la bibliothèque.
       theme.value = PLAYLIST_THEMES[playlists.items.length % PLAYLIST_THEMES.length].id;
@@ -234,7 +241,7 @@ onBeforeUnmount(() => {
           @pointerup="endDrag"
           @pointercancel="endDrag"
         >
-          <PlaylistCover :name="preview" :theme="theme" :styling="{ ...style, image: pending ? null : style.image }" :image-url="pending?.url ?? null" :radius="12" />
+          <PlaylistCover :name="preview" :theme="theme" :styling="{ ...style, image: pending ? null : style.image }" :image-url="pending?.url ?? null" :track-ids="trackIds" :radius="12" />
         </div>
         <p v-if="hasImage && tab === 'image'" class="hint">Glissez l'image pour la recadrer.</p>
       </div>
@@ -280,6 +287,17 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-else-if="tab === 'image'" class="panel">
+          <template v-if="trackIds.length">
+            <p class="label">Pochettes de la playlist</p>
+            <div class="chips">
+              <button type="button" class="chip" :class="{ on: !style.artwork }" @click="set('artwork', null)">Aucune</button>
+              <button type="button" class="chip" :class="{ on: style.artwork === 'single' }" @click="set('artwork', 'single')">Une pochette</button>
+              <button type="button" class="chip" :class="{ on: style.artwork === 'mosaic' }" @click="set('artwork', 'mosaic')">Mosaïque de 4</button>
+            </div>
+            <p v-if="style.artwork && hasImage" class="note">Votre image passe avant les pochettes : retirez-la pour les voir.</p>
+            <p v-else-if="style.artwork === 'mosaic'" class="note">Quatre albums différents de la playlist ; avec moins de quatre, une seule pochette.</p>
+            <p class="label">Ou une image à vous</p>
+          </template>
           <div class="row">
             <button type="button" class="pill pill-accent" @click="imageInput?.click()">{{ hasImage ? "Changer d'image" : "Choisir une image" }}</button>
             <button v-if="hasImage" type="button" class="pill pill-ghost" @click="removeImage">Retirer</button>

@@ -98,7 +98,7 @@ async function add() {
         </li>
         <li v-for="p in playlists.items" :key="p.id">
           <button type="button" class="row" role="option" :aria-selected="chosen.includes(p.id)" :class="{ on: chosen.includes(p.id) }" @click="toggle(p.id)">
-            <span class="cover"><PlaylistCover :name="p.name" :theme="p.theme" :styling="p.style" :radius="6" mini /></span>
+            <span class="cover"><PlaylistCover :name="p.name" :theme="p.theme" :styling="p.style" :track-ids="p.track_ids" :radius="6" mini /></span>
             <span class="text">
               <span class="name">{{ p.name }}</span>
               <span class="sub">{{ already(p.track_ids) || `${p.track_ids.length} morceau${p.track_ids.length > 1 ? "x" : ""}` }}</span>

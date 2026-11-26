@@ -135,7 +135,7 @@ function newPlaylist() {
         :class="{ active: ui.route.name === 'playlist' && ui.route.id === p.id }"
         @click="ui.go({ name: 'playlist', id: p.id })"
       >
-        <PlaylistCover :name="p.name" :theme="p.theme" :styling="p.style" :radius="4" mini class="pl-thumb" />
+        <PlaylistCover :name="p.name" :theme="p.theme" :styling="p.style" :track-ids="p.track_ids" :radius="4" mini class="pl-thumb" />
         <span class="ellipsis">{{ p.name }}</span>
       </button>
       <p v-if="!playlists.items.length" class="empty">Aucune playlist pour l'instant.</p>

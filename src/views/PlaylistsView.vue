@@ -44,7 +44,7 @@ function present(p: Playlist): number {
         <span class="count">{{ liked }} morceau{{ liked > 1 ? "x" : "" }}</span>
       </button>
       <button v-for="p in playlists.items" :key="p.id" type="button" class="card" @click="ui.go({ name: 'playlist', id: p.id })">
-        <PlaylistCover :name="p.name" :theme="p.theme" :styling="p.style" :radius="10" />
+        <PlaylistCover :name="p.name" :theme="p.theme" :styling="p.style" :track-ids="p.track_ids" :radius="10" />
         <span class="name">{{ p.name }}</span>
         <span class="count">{{ present(p) }} morceau{{ present(p) > 1 ? "x" : "" }}</span>
       </button>

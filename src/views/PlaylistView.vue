@@ -92,7 +92,7 @@ function share() {
   <div v-if="playlist" class="page">
     <header class="hero">
       <button type="button" class="cover" title="Personnaliser la jaquette" @click="ui.playlistDialog = { mode: 'edit', id: playlist.id }">
-        <PlaylistCover :name="playlist.name" :theme="playlist.theme" :styling="playlist.style" :radius="10" />
+        <PlaylistCover :name="playlist.name" :theme="playlist.theme" :styling="playlist.style" :track-ids="playlist.track_ids" :radius="10" />
         <span class="cover-edit">Personnaliser</span>
       </button>
       <div class="info">

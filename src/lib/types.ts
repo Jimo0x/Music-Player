@@ -65,7 +65,10 @@ export interface PlaylistStyle {
   place?: "top" | "middle" | "bottom";
   uppercase?: boolean;
   /** Motif décoratif du dégradé. */
-  pattern?: "rings" | "none" | "dots" | "stripes" | "grid" | "waves" | "stars";
+  pattern?: "rings" | "none" | "dots" | "stripes" | "grid" | "waves" | "stars" | "diamonds" | "hexagons" | "grain";
+  /** Jaquette faite des pochettes de la playlist (lot 0.12.0) : une seule, ou une mosaïque de
+   *  quatre albums différents. Une image choisie reste prioritaire. */
+  artwork?: "single" | "mosaic" | null;
   /** Police du titre sur la page de la playlist. */
   titleFont?: string | null;
 }
