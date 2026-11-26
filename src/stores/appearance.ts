@@ -6,6 +6,7 @@ import { BUILTIN_THEMES, DEFAULT_THEME_ID, isLight, themeVariables, withScheme, 
 import { defaultBackdrop, normalizeBackdrop, prepareBackdropImage, type BackdropSettings, type BackdropSource } from "@/lib/backdrop";
 import { defaultPattern, normalizePattern, type PatternSettings } from "@/lib/patterns";
 import { iconNameOf, normalizeIcons, sanitizeSvg, setCustomIcons, type CustomIcon } from "@/lib/iconPack";
+import { buildThemePack, type ParsedThemePack } from "@/lib/themePack";
 
 // Personnalisation de l'application : thème et mode clair / sombre, polices, boutons et
 // champs, icônes, profil, icône de l'application. Enregistrée côté Rust (appearance.json,
@@ -384,6 +385,58 @@ export const useAppearanceStore = defineStore("appearance", {
     clearIcons() {
       this.settings.customIcons = {};
       this.changed();
+    },
+    /** Paquet de thème complet de l'apparence actuelle, prêt à enregistrer (texte JSON). */
+    async exportThemePack(): Promise<string> {
+      const s = this.settings;
+      const pack = await buildThemePack(
+        {
+          theme: this.theme,
+          fonts: s.fonts,
+          customFonts: s.customFonts,
+          buttons: s.buttons,
+          fields: s.fields,
+          icons: s.icons,
+          pattern: s.pattern,
+          backdrop: s.backdrop,
+          customIcons: s.customIcons,
+        },
+        async (file) => new Uint8Array(await (await fetch(this.assetUrl(file))).arrayBuffer()),
+      );
+      return JSON.stringify(pack);
+    },
+    /** Applique un paquet reçu (déjà vérifié) : thème ajouté et choisi, polices et image
+     *  jointes enregistrées sur cet appareil, motif, fond, icônes et styles. */
+    async importThemePack(pack: ParsedThemePack) {
+      const s = this.settings;
+      const fontIds: (string | null)[] = [];
+      for (const f of pack.embeddedFonts) {
+        if (!f) {
+          fontIds.push(null);
+          continue;
+        }
+        const name = await api.importAsset("font", f.ext, f.bytes);
+        const id = `custom:${name}`;
+        s.customFonts.push({ id, label: f.label || "Police du thème", file: name });
+        fontIds.push(id);
+      }
+      for (const role of ["ui", "display", "lyrics"] as FontRole[]) {
+        const f = pack.fonts[role];
+        s.fonts[role] = "catalog" in f ? f.catalog : "embedded" in f ? (fontIds[f.embedded] ?? SYSTEM_FONT) : SYSTEM_FONT;
+      }
+      s.buttons = pack.look.buttons as AppearanceSettings["buttons"];
+      s.fields = pack.look.fields as AppearanceSettings["fields"];
+      s.icons = pack.look.icons as IconStyle;
+      s.pattern = pack.look.pattern;
+      s.customIcons = pack.look.customIcons;
+      const previousImage = s.backdrop.image;
+      let image = previousImage;
+      if (pack.look.backdropImage) {
+        image = await api.importAsset("image", pack.look.backdropImage.ext, pack.look.backdropImage.bytes);
+        if (previousImage) void api.deleteAsset(previousImage).catch(() => {});
+      }
+      s.backdrop = { ...pack.look.backdrop, image, source: pack.look.backdrop.source === "image" && !pack.look.backdropImage ? "none" : pack.look.backdrop.source };
+      this.saveTheme({ ...pack.theme, id: `perso-${Date.now().toString(36)}` });
     },
     setBackdropSource(source: BackdropSource) {
       if (source === "image" && !this.settings.backdrop.image) return;

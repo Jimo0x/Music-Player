@@ -6,6 +6,9 @@ import { catalogFont, SYSTEM_FONT } from "@/lib/fonts";
 import { FONTS } from "@/lib/fontCatalog";
 import { BUILTIN_THEMES, cloneTheme, contrast, parseHex, parseThemeFile, themeFile, themeVariables, type AdvancedColorKey, type FontRole, type Theme } from "@/lib/themes";
 import { useAppearanceStore, type ButtonShape, type ButtonStyle, type FieldShape, type FieldStyle, type IconStyle, type SchemeMode } from "@/stores/appearance";
+import { parseThemePack } from "@/lib/themePack";
+import { api } from "@/lib/api";
+import { shareFile } from "@/lib/androidMedia";
 import { ICON_NAMES } from "@/lib/iconPack";
 import { PATTERNS, patternMask, type PatternId, type PatternSettings } from "@/lib/patterns";
 import type { BackdropSource } from "@/lib/backdrop";
@@ -27,7 +30,7 @@ const current = computed(() => appearance.theme);
 const editable = computed(() => !current.value.builtin);
 const themeInput = ref<HTMLInputElement | null>(null);
 // Android : pas de filtre (un .json téléchargé y a souvent un type générique).
-const themeAccept = /Android/i.test(navigator.userAgent) ? undefined : ".json,application/json,text/plain";
+const themeAccept = /Android/i.test(navigator.userAgent) ? undefined : ".mptheme,.json,application/json,text/plain";
 
 // Police des titres de chaque thème, pour l'aperçu « Aa » de sa vignette.
 for (const t of appearance.themes) if (t.fonts?.display) void appearance.loadFont(t.fonts.display);
@@ -85,6 +88,22 @@ const readability = computed(() => {
   return bg && text ? contrast(bg, text) : 21;
 });
 
+// Paquet complet (.mptheme) : le thème et tout le reste de l'apparence, polices et fond joints.
+const exportingPack = ref(false);
+async function exportPack() {
+  exportingPack.value = true;
+  try {
+    const path = await api.saveThemePack(await appearance.exportThemePack(), `Thème ${current.value.name}`);
+    if (!path) return;
+    if (/Android/i.test(navigator.userAgent)) shareFile(path);
+    else ui.notify("Thème complet enregistré : il s'importe avec « Importer un thème »");
+  } catch (e) {
+    ui.notify(`Export impossible : ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    exportingPack.value = false;
+  }
+}
+
 async function copyTheme() {
   try {
     await navigator.clipboard.writeText(themeFile(current.value));
@@ -95,12 +114,23 @@ async function copyTheme() {
 }
 async function pasteTheme() {
   try {
-    importTheme(await navigator.clipboard.readText());
+    await importTheme(await navigator.clipboard.readText());
   } catch {
     ui.notify("Lecture du presse-papiers impossible : importez plutôt un fichier");
   }
 }
-function importTheme(text: string) {
+async function importTheme(text: string) {
+  // Paquet complet (.mptheme) : polices, fond, motif, icônes et styles avec le thème.
+  const pack = parseThemePack(text);
+  if (pack) {
+    try {
+      await appearance.importThemePack(pack);
+      ui.notify(`Thème complet « ${pack.name} » appliqué`);
+    } catch (e) {
+      ui.notify(`Thème impossible à appliquer : ${e instanceof Error ? e.message : String(e)}`);
+    }
+    return;
+  }
   const theme = parseThemeFile(text);
   if (!theme) {
     ui.notify("Ce n'est pas un thème valide");
@@ -113,7 +143,7 @@ async function onThemeFile(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
-  if (file) importTheme(await file.text());
+  if (file) await importTheme(await file.text());
 }
 
 function resetAll() {
@@ -451,6 +481,7 @@ const VINYL_COLORS: { id: VinylColor; label: string }[] = [
         <button type="button" class="pill pill-ghost" @click="themeInput?.click()">Importer un thème</button>
         <button type="button" class="pill pill-ghost" @click="pasteTheme">Coller un thème</button>
         <button type="button" class="pill pill-ghost" @click="copyTheme">Copier ce thème</button>
+        <button type="button" class="pill pill-ghost" :disabled="exportingPack" @click="exportPack"><Icon name="share" :size="15" /> {{ exportingPack ? "Préparation…" : "Exporter le thème complet" }}</button>
         <input ref="themeInput" type="file" :accept="themeAccept" hidden @change="onThemeFile" />
       </div>
     </section>

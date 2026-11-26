@@ -1087,6 +1087,36 @@ pub fn save_backup(app: AppHandle, json: String, name: String) -> Result<Option<
     Ok(Some(dest.to_string_lossy().to_string()))
 }
 
+/// Paquet de thème complet (couleurs, polices importées, fond, motif, icônes), lot 0.12.0.
+pub const THEME_PACK_EXTENSION: &str = "mptheme";
+const THEME_PACK_MAX: usize = 60 * 1024 * 1024;
+
+/// Le texte est-il un paquet de thème plausible (JSON, bon format, taille raisonnable) ? Le
+/// contenu détaillé est vérifié par l'interface à l'import.
+fn valid_theme_pack(json: &str) -> Result<(), String> {
+    if json.len() > THEME_PACK_MAX {
+        return Err("Thème trop volumineux (60 Mo au plus).".into());
+    }
+    let value: serde_json::Value = serde_json::from_str(json).map_err(|_| "Thème invalide.".to_string())?;
+    if value.get("format").and_then(|f| f.as_str()) != Some("music-player-theme-pack") {
+        return Err("Ce fichier n'est pas un thème Music Player.".into());
+    }
+    Ok(())
+}
+
+/// Écrit un paquet de thème préparé par l'interface ; ordinateur : « Enregistrer sous »,
+/// Android : dans le cache, partagé ensuite par la feuille de partage. `None` : annulé.
+#[tauri::command(async)]
+pub fn save_theme_pack(app: AppHandle, json: String, name: String) -> Result<Option<String>, String> {
+    valid_theme_pack(&json)?;
+    let file = bundle_filename(&name).replace(&format!(".{}", sharing::EXTENSION), &format!(".{THEME_PACK_EXTENSION}"));
+    let Some(dest) = pick_save_path_as(&app, &file, "Thème Music Player", THEME_PACK_EXTENSION) else {
+        return Ok(None);
+    };
+    std::fs::write(&dest, json).map_err(|e| e.to_string())?;
+    Ok(Some(dest.to_string_lossy().to_string()))
+}
+
 /// Contenu d'une sauvegarde ouverte avec l'appli (« Ouvrir avec Music Player »).
 /// Image à partager (carte de paroles, récap) : posée dans le cache de l'appli, où la feuille de
 /// partage d'Android va la chercher. Effacée avec les autres partages au bout d'un jour.
@@ -1800,5 +1830,17 @@ mod resume_tests {
         let stale = text.replacen("\"at\":", "\"at\":1,\"_\":", 1);
         std::fs::write(&file, stale).unwrap();
         assert!(PartsResume::load(&file, &code).is_none(), "trop ancienne");
+    }
+}
+
+#[cfg(test)]
+mod theme_pack_tests {
+    use super::valid_theme_pack;
+
+    #[test]
+    fn only_a_theme_pack_is_saved() {
+        assert!(valid_theme_pack(r#"{"format":"music-player-theme-pack","version":1}"#).is_ok());
+        assert!(valid_theme_pack(r#"{"format":"autre"}"#).is_err());
+        assert!(valid_theme_pack("pas du json").is_err());
     }
 }

@@ -218,6 +218,7 @@ pub fn run() {
             commands::remove_duplicates,
             commands::take_opened_file,
             commands::save_backup,
+            commands::save_theme_pack,
             commands::read_backup,
             commands::import_listens,
             commands::get_spectrum,

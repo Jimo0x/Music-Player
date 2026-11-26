@@ -371,6 +371,7 @@ export function installTauriMock() {
     share_image: ({ name }) => `/cache/partages/${name}.png`,
     save_image: ({ name }) => `C:/Users/Moi/Pictures/Music Player/${name}`,
     save_backup: ({ name }) => `C:/Users/Moi/Documents/${name}.mpsave`,
+    save_theme_pack: ({ name }) => `C:/Users/Moi/Documents/${name}.mptheme`,
     read_backup: () => {
       throw new Error("Lecture de fichier indisponible en mode démo.");
     },

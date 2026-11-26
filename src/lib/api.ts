@@ -141,6 +141,8 @@ export const api = {
   addFavorites: (trackIds: string[]) => invoke<number>("add_favorites", { trackIds }),
   /** Sauvegarde (.mpsave) : enregistrée (chemin, null si annulé), lue, écoute fusionnée. */
   saveBackup: (json: string, name: string) => invoke<string | null>("save_backup", { json, name }),
+  /** Paquet de thème complet (.mptheme) : « Enregistrer sous » ou feuille de partage (Android). */
+  saveThemePack: (json: string, name: string) => invoke<string | null>("save_theme_pack", { json, name }),
   readBackup: (path: string) => invoke<string>("read_backup", { path }),
   importListens: (listens: import("./recap").Listen[]) => invoke<number>("import_listens", { listens }),
   /** Visualiseur : spectre du son joué (32 bandes, 0 à 255 ; vide en pause). */
