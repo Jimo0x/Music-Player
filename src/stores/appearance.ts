@@ -3,6 +3,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { api } from "@/lib/api";
 import { ensureFont, fontStack, SYSTEM_FONT, type CustomFont } from "@/lib/fonts";
 import { BUILTIN_THEMES, DEFAULT_THEME_ID, isLight, themeVariables, withScheme, type FontRole, type Theme } from "@/lib/themes";
+import { defaultBackdrop, normalizeBackdrop, prepareBackdropImage, type BackdropSettings, type BackdropSource } from "@/lib/backdrop";
 
 // Personnalisation de l'application : thème et mode clair / sombre, polices, boutons et
 // champs, icônes, profil, icône de l'application. Enregistrée côté Rust (appearance.json,
@@ -35,6 +36,8 @@ export interface AppearanceSettings {
   appIcon: string;
   /** Photo choisie comme icône de fenêtre (ordinateur). */
   appIconImage: string | null;
+  /** Arrière-plan de l'application (lot 0.12.0). */
+  backdrop: BackdropSettings;
 }
 
 const CACHE_KEY = "mp:appearance-vars";
@@ -55,6 +58,7 @@ export function defaultAppearance(): AppearanceSettings {
     profile: { name: "", avatar: null },
     appIcon: "origine",
     appIconImage: null,
+    backdrop: defaultBackdrop(),
   };
 }
 
@@ -93,6 +97,7 @@ function normalize(raw: unknown): AppearanceSettings {
     },
     appIcon: typeof o.appIcon === "string" && /^[a-z]{2,20}$/.test(o.appIcon) ? o.appIcon : base.appIcon,
     appIconImage: str(o.appIconImage),
+    backdrop: normalizeBackdrop(o.backdrop),
   };
 }
 
@@ -216,6 +221,7 @@ export const useAppearanceStore = defineStore("appearance", {
           fieldShape: s.fields.shape,
           fieldStyle: s.fields.style,
           icons: s.icons,
+          backdrop: s.backdrop.source,
         },
       };
       setVariables(applied);
@@ -342,6 +348,29 @@ export const useAppearanceStore = defineStore("appearance", {
       await this.applyWindowIcon(true);
       return true;
     },
+    setBackdropSource(source: BackdropSource) {
+      if (source === "image" && !this.settings.backdrop.image) return;
+      this.settings.backdrop.source = source;
+      this.changed();
+    },
+    /** Image de fond choisie : réduite, enregistrée, et l'ancienne supprimée. */
+    async setBackdropImage(file: Blob) {
+      const blob = await prepareBackdropImage(file);
+      const b = this.settings.backdrop;
+      b.image = await this.replaceImage(blob, b.image);
+      b.source = "image";
+      b.x = 50;
+      b.y = 50;
+      this.changed();
+    },
+    clearBackdropImage() {
+      const b = this.settings.backdrop;
+      const previous = b.image;
+      b.image = null;
+      if (b.source === "image") b.source = "none";
+      this.changed();
+      if (previous) void api.deleteAsset(previous).catch(() => {});
+    },
     /** Apparence d'une sauvegarde : tout sauf les fichiers propres à l'autre appareil (photo
      *  de profil, polices importées), qui gardent ceux de cet appareil. */
     restore(raw: unknown) {
@@ -360,6 +389,8 @@ export const useAppearanceStore = defineStore("appearance", {
         profile: { name: incoming.profile.name || mine.profile.name, avatar: mine.profile.avatar },
         appIcon: incoming.appIcon === "photo" ? mine.appIcon : incoming.appIcon,
         appIconImage: mine.appIconImage,
+        // L'image de fond est un fichier de l'autre appareil : on garde celle d'ici.
+        backdrop: { ...incoming.backdrop, image: mine.backdrop.image, source: incoming.backdrop.source === "image" && !mine.backdrop.image ? "none" : incoming.backdrop.source },
       };
       this.changed();
     },
@@ -369,7 +400,9 @@ export const useAppearanceStore = defineStore("appearance", {
       const profile = this.settings.profile;
       const appIcon = this.settings.appIcon;
       const appIconImage = this.settings.appIconImage;
-      this.settings = { ...defaultAppearance(), customThemes: keep, customFonts: fonts, profile, appIcon, appIconImage };
+      // L'image de fond importée reste disponible (le fond, lui, revient à « aucun »).
+      const backdrop = { ...defaultBackdrop(), image: this.settings.backdrop.image };
+      this.settings = { ...defaultAppearance(), customThemes: keep, customFonts: fonts, profile, appIcon, appIconImage, backdrop };
       this.changed();
     },
   },

@@ -6,6 +6,7 @@ import { catalogFont, SYSTEM_FONT } from "@/lib/fonts";
 import { FONTS } from "@/lib/fontCatalog";
 import { BUILTIN_THEMES, cloneTheme, contrast, parseHex, parseThemeFile, themeFile, type FontRole, type Theme } from "@/lib/themes";
 import { useAppearanceStore, type ButtonShape, type ButtonStyle, type FieldShape, type FieldStyle, type IconStyle, type SchemeMode } from "@/stores/appearance";
+import type { BackdropSource } from "@/lib/backdrop";
 import { useUiStore } from "@/stores/ui";
 import { useBaladeurStore } from "@/stores/baladeur";
 import { SKINS } from "@/lib/baladeur";
@@ -182,6 +183,43 @@ onMounted(async () => {
   }
 });
 const canPin = computed(() => onAndroid && (window.AndroidLook?.canPinShortcut?.() ?? false));
+
+// ---- Arrière-plan (lot 0.12.0) ----
+const BACKDROPS: { id: BackdropSource; label: string }[] = [
+  { id: "none", label: "Aucun" },
+  { id: "image", label: "Mon image" },
+  { id: "artwork", label: "Pochette en cours" },
+];
+const backdropInput = ref<HTMLInputElement | null>(null);
+const backdropBusy = ref(false);
+function chooseBackdrop(id: BackdropSource) {
+  if (id === "image" && !s.value.backdrop.image) backdropInput.value?.click();
+  else appearance.setBackdropSource(id);
+}
+async function onBackdropFile(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    ui.notify("Choisissez une image (JPG, PNG, WebP…).");
+    return;
+  }
+  backdropBusy.value = true;
+  try {
+    await appearance.setBackdropImage(file);
+    ui.notify("Arrière-plan enregistré");
+  } catch (e) {
+    ui.notify(`Image impossible à utiliser : ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    backdropBusy.value = false;
+  }
+}
+function setBackdrop(key: "blur" | "dim" | "x" | "y", event: Event) {
+  const value = +(event.target as HTMLInputElement).value;
+  s.value.backdrop[key] = key === "dim" ? value / 100 : value;
+  appearance.changed();
+}
 
 type CropPurpose = "avatar" | "pc-icon" | "shortcut";
 const cropping = ref<{ purpose: CropPurpose; url: string } | null>(null);
@@ -382,6 +420,49 @@ const VINYL_COLORS: { id: VinylColor; label: string }[] = [
       <div class="actions">
         <button type="button" class="pill pill-ghost danger" @click="remove"><Icon name="trash" :size="15" /> Supprimer ce thème</button>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>Arrière-plan</h2>
+      <div class="seg wide" role="radiogroup" aria-label="Arrière-plan">
+        <button v-for="o in BACKDROPS" :key="o.id" type="button" role="radio" :aria-checked="s.backdrop.source === o.id" :class="{ on: s.backdrop.source === o.id }" :disabled="backdropBusy" @click="chooseBackdrop(o.id)">
+          {{ o.label }}
+        </button>
+      </div>
+      <div v-if="s.backdrop.image || s.backdrop.source === 'image'" class="backdrop-pick">
+        <span class="backdrop-thumb" :style="s.backdrop.image ? { backgroundImage: `url(&quot;${appearance.assetUrl(s.backdrop.image)}&quot;)`, backgroundPosition: `${s.backdrop.x}% ${s.backdrop.y}%` } : {}" />
+        <div class="row">
+          <button type="button" class="pill pill-ghost" :disabled="backdropBusy" @click="backdropInput?.click()">
+            <Icon name="image" :size="15" /> {{ backdropBusy ? "Préparation…" : s.backdrop.image ? "Changer l'image" : "Choisir une image" }}
+          </button>
+          <button v-if="s.backdrop.image" type="button" class="pill pill-ghost danger" :disabled="backdropBusy" @click="appearance.clearBackdropImage()">Retirer</button>
+        </div>
+      </div>
+      <template v-if="s.backdrop.source !== 'none'">
+        <label class="slider">
+          <span>Flou <em>{{ s.backdrop.blur }} px</em></span>
+          <input type="range" min="0" max="30" step="1" :value="s.backdrop.blur" @input="setBackdrop('blur', $event)" />
+        </label>
+        <label class="slider">
+          <span>Assombrissement <em>{{ Math.round(s.backdrop.dim * 100) }} %</em></span>
+          <input type="range" min="0" max="90" step="5" :value="Math.round(s.backdrop.dim * 100)" @input="setBackdrop('dim', $event)" />
+        </label>
+        <template v-if="s.backdrop.source === 'image'">
+          <label class="slider">
+            <span>Cadrage horizontal <em>{{ s.backdrop.x }} %</em></span>
+            <input type="range" min="0" max="100" step="1" :value="s.backdrop.x" @input="setBackdrop('x', $event)" />
+          </label>
+          <label class="slider">
+            <span>Cadrage vertical <em>{{ s.backdrop.y }} %</em></span>
+            <input type="range" min="0" max="100" step="1" :value="s.backdrop.y" @input="setBackdrop('y', $event)" />
+          </label>
+        </template>
+        <p class="muted small">
+          Un voile de la couleur du thème garde le texte lisible : augmentez l'assombrissement si une image claire gêne la lecture. En affichage léger, le flou est retiré
+          pour ménager le téléphone.
+        </p>
+      </template>
+      <input ref="backdropInput" type="file" accept="image/*" hidden @change="onBackdropFile" />
     </section>
 
     <section class="card">
@@ -951,6 +1032,21 @@ h2 {
 }
 .profile-fields .field {
   margin: 0;
+}
+.backdrop-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+.backdrop-thumb {
+  flex: none;
+  width: 96px;
+  height: 60px;
+  border-radius: var(--radius);
+  background-color: rgba(var(--fg-rgb), 0.08);
+  background-size: cover;
+  box-shadow: inset 0 0 0 1px var(--separator);
 }
 .row {
   display: flex;

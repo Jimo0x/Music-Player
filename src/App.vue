@@ -19,6 +19,7 @@ import { usePlaylistsStore } from "@/stores/playlists";
 import { useShareStore } from "@/stores/share";
 import { useUiStore } from "@/stores/ui";
 import { useUpdaterStore } from "@/stores/updater";
+import AppBackdrop from "@/components/AppBackdrop.vue";
 import Icon from "@/components/Icon.vue";
 import MobileBar from "@/components/MobileBar.vue";
 import MobileTop from "@/components/MobileTop.vue";
@@ -419,6 +420,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div v-if="ready" class="app" :class="{ mobile: ui.isMobile, 'has-track': !!player.currentTrack }">
+    <AppBackdrop />
     <Sidebar v-if="!ui.isMobile" ref="sidebar" />
 
     <div class="main">
@@ -553,6 +555,8 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 236px 1fr;
   background: var(--bg-content);
+  /* L'arrière-plan choisi (AppBackdrop, z-index -1) passe sous l'interface, au-dessus de ce fond. */
+  isolation: isolate;
 }
 .app.mobile {
   grid-template-columns: 1fr;
@@ -602,6 +606,11 @@ onBeforeUnmount(() => {
 /* Thème d'origine : palette de Persona 3 Reload. Thème personnalisé : son propre fond. */
 :root[data-themed] .content.home {
   background: var(--home-bg);
+}
+/* Arrière-plan choisi : l'accueil le laisse voir au lieu de le couvrir de son dégradé. */
+:root[data-backdrop="image"] .content.home,
+:root[data-backdrop="artwork"] .content.home {
+  background: transparent !important;
 }
 :root:not([data-themed]) .content.home {
   --accent: #3fb8ff;
