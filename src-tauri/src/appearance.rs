@@ -70,15 +70,32 @@ pub fn decode_base64(data: &str) -> Result<Vec<u8>, String> {
         .map_err(|_| "Fichier illisible.".to_string())
 }
 
-/// Supprime un fichier importé devenu inutile. Le nom doit être un simple nom de fichier
-/// du dossier `custom/` (jamais un chemin).
-pub fn remove(data_dir: &Path, name: &str) -> Result<(), String> {
-    let valid = !name.is_empty()
+/// Simple nom de fichier du dossier `custom/` (jamais un chemin).
+fn valid_name(name: &str) -> bool {
+    !name.is_empty()
         && name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.')
-        && !name.starts_with('.');
-    if !valid {
+        && !name.starts_with('.')
+}
+
+/// Contenu d'un fichier importé (paquet de thème : polices et image jointes).
+pub fn read(data_dir: &Path, name: &str) -> Result<Vec<u8>, String> {
+    if !valid_name(name) {
+        return Err("Nom de fichier invalide.".into());
+    }
+    let path = custom_dir(data_dir).join(name);
+    let len = std::fs::metadata(&path).map_err(|_| "Fichier introuvable.".to_string())?.len();
+    if len > MAX_ASSET_BYTES as u64 {
+        return Err("Fichier trop volumineux.".into());
+    }
+    std::fs::read(path).map_err(|e| e.to_string())
+}
+
+/// Supprime un fichier importé devenu inutile. Le nom doit être un simple nom de fichier
+/// du dossier `custom/` (jamais un chemin).
+pub fn remove(data_dir: &Path, name: &str) -> Result<(), String> {
+    if !valid_name(name) {
         return Err("Nom de fichier invalide.".into());
     }
     match std::fs::remove_file(custom_dir(data_dir).join(name)) {
@@ -112,6 +129,9 @@ mod tests {
         assert!(import(dir.path(), "autre", "png", b"x").is_err());
         assert!(remove(dir.path(), "../appearance.json").is_err());
         assert!(remove(dir.path(), "dossier/x.png").is_err());
+        assert_eq!(read(dir.path(), &name).unwrap(), b"police");
+        assert!(read(dir.path(), "../appearance.json").is_err());
+        assert!(read(dir.path(), "absent.ttf").is_err());
         remove(dir.path(), &name).unwrap();
         assert!(!custom_dir(dir.path()).join(&name).exists());
         // Déjà supprimé : pas une erreur.

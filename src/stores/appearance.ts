@@ -401,7 +401,8 @@ export const useAppearanceStore = defineStore("appearance", {
           backdrop: s.backdrop,
           customIcons: s.customIcons,
         },
-        async (file) => new Uint8Array(await (await fetch(this.assetUrl(file))).arrayBuffer()),
+        // Par le moteur Rust : la CSP n'autorise pas fetch() sur les fichiers locaux.
+        async (file) => Uint8Array.from(atob(await api.readAsset(file)), (c) => c.charCodeAt(0)),
       );
       return JSON.stringify(pack);
     },

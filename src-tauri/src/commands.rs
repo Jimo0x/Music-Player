@@ -738,6 +738,13 @@ pub fn delete_asset(state: State<AppState>, name: String) -> Result<(), String> 
     crate::appearance::remove(&state.data_dir, &name)
 }
 
+/// Contenu d'un fichier importé, en base64 (paquet de thème : polices et image jointes).
+#[tauri::command(async)]
+pub fn read_asset(state: State<'_, AppState>, name: String) -> Result<String, String> {
+    use base64::Engine;
+    crate::appearance::read(&state.data_dir, &name).map(|bytes| base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
 #[tauri::command]
 pub fn add_to_playlist(
     state: State<AppState>,

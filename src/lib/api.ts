@@ -120,6 +120,8 @@ export const api = {
       ? invoke<string>("import_asset", { kind, ext, data: await toBase64(bytes) })
       : invoke<string>("import_asset", bytes, { headers: { "x-kind": kind, "x-ext": ext } }),
   deleteAsset: (name: string) => invoke<void>("delete_asset", { name }),
+  /** Contenu d'un fichier importé (base64), pour le joindre à un paquet de thème. */
+  readAsset: (name: string) => invoke<string>("read_asset", { name }),
   deletePlaylist: (id: string) => invoke<void>("delete_playlist", { id }),
   renamePlaylist: (id: string, name: string) => invoke<void>("rename_playlist", { id, name }),
   addToPlaylist: (playlistId: string, trackId: string) =>

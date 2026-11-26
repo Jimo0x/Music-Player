@@ -408,6 +408,14 @@ export function installTauriMock() {
     delete_asset: ({ name }) => {
       assets.delete(name);
     },
+    read_asset: async ({ name }) => {
+      const url = assets.get(String(name));
+      if (!url) throw "Fichier introuvable.";
+      const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+      let binary = "";
+      for (const b of bytes) binary += String.fromCharCode(b);
+      return btoa(binary);
+    },
     add_tracks_to_playlist: ({ playlistId, trackIds }) => {
       const pl = playlists.find((p) => p.id === playlistId);
       if (!pl) throw new Error("Playlist introuvable.");
