@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.12.0",
+    "date": "2026-11-26",
+    "items": [
+      "Arrière-plan : mettez votre propre image en fond de l'appli, ou la pochette du morceau en cours, avec flou, assombrissement et cadrage (Personnalisation).",
+      "Motifs : points, grille, vagues, hexagones, étoiles, grain… posés sur le fond, avec l'intensité, la taille et la couleur de votre choix.",
+      "Thèmes : en plus des couleurs de base, choisissez celles de la barre latérale, de la barre du lecteur, du texte secondaire, des réussites et des erreurs.",
+      "Icônes : importez vos propres icônes (fichiers SVG nommés comme celles de l'appli) ; elles prennent les couleurs du thème.",
+      "Jaquettes de playlists : une pochette de la playlist ou une mosaïque de quatre albums, et de nouveaux motifs.",
+      "Thème complet : exportez toute votre apparence (couleurs, polices, fond, motif, icônes) dans un seul fichier à partager, qui s'importe d'un geste."
+    ]
+  },
+  {
     "version": "0.11.1",
     "date": "2026-11-21",
     "items": [
