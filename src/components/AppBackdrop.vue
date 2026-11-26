@@ -5,6 +5,7 @@
 // retire le flou.
 import { computed, ref, watch } from "vue";
 import { coverUrl } from "@/lib/covers";
+import { patternMask } from "@/lib/patterns";
 import { useAppearanceStore } from "@/stores/appearance";
 import { usePlayerStore } from "@/stores/player";
 
@@ -37,14 +38,31 @@ const imageStyle = computed(() => ({
   "--backdrop-blur": `${b.value.blur}px`,
 }));
 const veilStyle = computed(() => ({ opacity: String(b.value.dim) }));
+
+// Motif : un aplat de la couleur choisie, découpé par la tuile SVG répétée.
+const p = computed(() => appearance.settings.pattern);
+const patternStyle = computed(() => {
+  const mask = patternMask(p.value.id, p.value.scale);
+  if (!mask) return null;
+  return {
+    background: p.value.color === "accent" ? "var(--accent)" : "var(--text)",
+    opacity: String(p.value.opacity),
+    maskImage: mask.image,
+    WebkitMaskImage: mask.image,
+    maskSize: mask.size,
+    WebkitMaskSize: mask.size,
+  };
+});
+const shown = computed(() => b.value.source !== "none" || !!patternStyle.value);
 </script>
 
 <template>
-  <div v-if="b.source !== 'none'" class="app-backdrop" aria-hidden="true">
+  <div v-if="shown" class="app-backdrop" aria-hidden="true">
     <Transition name="backdrop-fade">
       <div v-if="url" :key="url" class="image" :style="imageStyle" />
     </Transition>
-    <div class="veil" :style="veilStyle" />
+    <div v-if="b.source !== 'none'" class="veil" :style="veilStyle" />
+    <div v-if="patternStyle" class="pattern" :style="patternStyle" />
   </div>
 </template>
 
@@ -69,6 +87,12 @@ const veilStyle = computed(() => ({ opacity: String(b.value.dim) }));
   position: absolute;
   inset: 0;
   background: var(--bg-content);
+}
+.pattern {
+  position: absolute;
+  inset: 0;
+  mask-repeat: repeat;
+  -webkit-mask-repeat: repeat;
 }
 .backdrop-fade-enter-active,
 .backdrop-fade-leave-active {

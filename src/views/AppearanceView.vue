@@ -6,6 +6,7 @@ import { catalogFont, SYSTEM_FONT } from "@/lib/fonts";
 import { FONTS } from "@/lib/fontCatalog";
 import { BUILTIN_THEMES, cloneTheme, contrast, parseHex, parseThemeFile, themeFile, type FontRole, type Theme } from "@/lib/themes";
 import { useAppearanceStore, type ButtonShape, type ButtonStyle, type FieldShape, type FieldStyle, type IconStyle, type SchemeMode } from "@/stores/appearance";
+import { PATTERNS, patternMask, type PatternId, type PatternSettings } from "@/lib/patterns";
 import type { BackdropSource } from "@/lib/backdrop";
 import { useUiStore } from "@/stores/ui";
 import { useBaladeurStore } from "@/stores/baladeur";
@@ -218,6 +219,18 @@ async function onBackdropFile(event: Event) {
 function setBackdrop(key: "blur" | "dim" | "x" | "y", event: Event) {
   const value = +(event.target as HTMLInputElement).value;
   s.value.backdrop[key] = key === "dim" ? value / 100 : value;
+  appearance.changed();
+}
+
+// ---- Motif du fond (lot 0.12.0) ----
+const PATTERN_CHOICES = [{ id: "none" as PatternId, label: "Aucun" }, ...PATTERNS.map((x) => ({ id: x.id as PatternId, label: x.label }))];
+function patternPreview(id: PatternId) {
+  const mask = patternMask(id, 0.8);
+  if (!mask) return {};
+  return { maskImage: mask.image, WebkitMaskImage: mask.image, maskSize: mask.size, WebkitMaskSize: mask.size };
+}
+function setPattern(change: Partial<PatternSettings>) {
+  Object.assign(s.value.pattern, change);
   appearance.changed();
 }
 
@@ -463,6 +476,30 @@ const VINYL_COLORS: { id: VinylColor; label: string }[] = [
         </p>
       </template>
       <input ref="backdropInput" type="file" accept="image/*" hidden @change="onBackdropFile" />
+    </section>
+
+    <section class="card">
+      <h2>Motif</h2>
+      <div class="patterns" role="radiogroup" aria-label="Motif du fond">
+        <button v-for="o in PATTERN_CHOICES" :key="o.id" type="button" role="radio" class="pattern-choice" :class="{ on: s.pattern.id === o.id }" :aria-checked="s.pattern.id === o.id" @click="setPattern({ id: o.id })">
+          <span class="pattern-sample"><span v-if="o.id !== 'none'" class="pattern-fill" :style="patternPreview(o.id)" /></span>
+          <span class="pattern-label">{{ o.label }}</span>
+        </button>
+      </div>
+      <template v-if="s.pattern.id !== 'none'">
+        <label class="slider">
+          <span>Intensité <em>{{ Math.round(s.pattern.opacity * 100) }} %</em></span>
+          <input type="range" min="2" max="40" step="1" :value="Math.round(s.pattern.opacity * 100)" @input="setPattern({ opacity: +($event.target as HTMLInputElement).value / 100 })" />
+        </label>
+        <label class="slider">
+          <span>Taille <em>× {{ s.pattern.scale.toFixed(1) }}</em></span>
+          <input type="range" min="5" max="30" step="1" :value="Math.round(s.pattern.scale * 10)" @input="setPattern({ scale: +($event.target as HTMLInputElement).value / 10 })" />
+        </label>
+        <div class="seg" role="radiogroup" aria-label="Couleur du motif">
+          <button type="button" role="radio" :aria-checked="s.pattern.color === 'text'" :class="{ on: s.pattern.color === 'text' }" @click="setPattern({ color: 'text' })">Couleur du texte</button>
+          <button type="button" role="radio" :aria-checked="s.pattern.color === 'accent'" :class="{ on: s.pattern.color === 'accent' }" @click="setPattern({ color: 'accent' })">Couleur d'accent</button>
+        </div>
+      </template>
     </section>
 
     <section class="card">
@@ -1032,6 +1069,45 @@ h2 {
 }
 .profile-fields .field {
   margin: 0;
+}
+.patterns {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.pattern-choice {
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--radius);
+  background: rgba(var(--fg-rgb), 0.04);
+  color: var(--text);
+  font: inherit;
+}
+.pattern-choice.on {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.pattern-sample {
+  position: relative;
+  height: 46px;
+  border-radius: calc(var(--radius) * 0.7);
+  background: var(--bg-content);
+  overflow: hidden;
+}
+.pattern-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--text);
+  opacity: 0.45;
+  mask-repeat: repeat;
+  -webkit-mask-repeat: repeat;
+}
+.pattern-label {
+  font-size: 12px;
+  text-align: center;
 }
 .backdrop-pick {
   display: flex;

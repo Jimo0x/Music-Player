@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { ensureFont, fontStack, SYSTEM_FONT, type CustomFont } from "@/lib/fonts";
 import { BUILTIN_THEMES, DEFAULT_THEME_ID, isLight, themeVariables, withScheme, type FontRole, type Theme } from "@/lib/themes";
 import { defaultBackdrop, normalizeBackdrop, prepareBackdropImage, type BackdropSettings, type BackdropSource } from "@/lib/backdrop";
+import { defaultPattern, normalizePattern, type PatternSettings } from "@/lib/patterns";
 
 // Personnalisation de l'application : thème et mode clair / sombre, polices, boutons et
 // champs, icônes, profil, icône de l'application. Enregistrée côté Rust (appearance.json,
@@ -38,6 +39,8 @@ export interface AppearanceSettings {
   appIconImage: string | null;
   /** Arrière-plan de l'application (lot 0.12.0). */
   backdrop: BackdropSettings;
+  /** Motif posé sur le fond (lot 0.12.0). */
+  pattern: PatternSettings;
 }
 
 const CACHE_KEY = "mp:appearance-vars";
@@ -59,6 +62,7 @@ export function defaultAppearance(): AppearanceSettings {
     appIcon: "origine",
     appIconImage: null,
     backdrop: defaultBackdrop(),
+    pattern: defaultPattern(),
   };
 }
 
@@ -98,6 +102,7 @@ function normalize(raw: unknown): AppearanceSettings {
     appIcon: typeof o.appIcon === "string" && /^[a-z]{2,20}$/.test(o.appIcon) ? o.appIcon : base.appIcon,
     appIconImage: str(o.appIconImage),
     backdrop: normalizeBackdrop(o.backdrop),
+    pattern: normalizePattern(o.pattern),
   };
 }
 
@@ -222,6 +227,7 @@ export const useAppearanceStore = defineStore("appearance", {
           fieldStyle: s.fields.style,
           icons: s.icons,
           backdrop: s.backdrop.source,
+          pattern: s.pattern.id,
         },
       };
       setVariables(applied);

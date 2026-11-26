@@ -607,9 +607,10 @@ onBeforeUnmount(() => {
 :root[data-themed] .content.home {
   background: var(--home-bg);
 }
-/* Arrière-plan choisi : l'accueil le laisse voir au lieu de le couvrir de son dégradé. */
+/* Arrière-plan ou motif choisi : l'accueil le laisse voir au lieu de le couvrir de son dégradé. */
 :root[data-backdrop="image"] .content.home,
-:root[data-backdrop="artwork"] .content.home {
+:root[data-backdrop="artwork"] .content.home,
+:root[data-pattern]:not([data-pattern="none"]) .content.home {
   background: transparent !important;
 }
 :root:not([data-themed]) .content.home {
