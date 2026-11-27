@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.14.1",
+    "date": "2026-11-27",
+    "items": [
+      "Mode immersif : un simple appui sur son bouton de l'écran « À l'écoute » l'allume ou l'éteint, avec vos réglages gardés. Le petit bouton à côté (ou un appui long) ouvre les réglages."
+    ]
+  },
+  {
     "version": "0.14.0",
     "date": "2026-11-26",
     "items": [
