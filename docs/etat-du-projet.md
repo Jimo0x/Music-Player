@@ -97,6 +97,11 @@ branche `sauvegarde-main-avant-nettoyage` supprimée (ancienne tête `d42bc2a`).
 - #23 Traduction Français / English / langue du système.
 - #24 Lignes `Co-authored-by:` automatiques dans ses branches et son fork (le `main` du dépôt
   est propre).
+- #25 Bogue : sons téléchargés sans pochette (chemin yt-dlp, ordinateur et téléphone ; seul
+  spotDL intègre la pochette). Diagnostic et correctif détaillés dans le ticket.
+- #26 Reconnaître un son (écoute, fredonnement, bouts de paroles) : évaluation des services
+  (aucun gratuit et fiable pour l'écoute et le fredonnement ; LRCLIB ne cherche pas dans les
+  paroles), étape 0 d'essais réels avant tout code, puis paroles d'abord.
 
 ## Vérifications sur de vrais appareils
 
