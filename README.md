@@ -304,8 +304,8 @@ scripts/android-patch.mjs  Complète le projet Android généré (services, perm
 docs/                 État du projet (etat-du-projet.md) et notes de conception
 ```
 
-Pour reprendre le travail : [CLAUDE.md](CLAUDE.md) (façon de travailler, publication, relais)
-et [docs/etat-du-projet.md](docs/etat-du-projet.md) (versions, reste à faire). Pour
+Pour reprendre le travail : [docs/etat-du-projet.md](docs/etat-du-projet.md) (versions,
+reste à faire, publication). Pour
 contribuer : [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Développement en local
