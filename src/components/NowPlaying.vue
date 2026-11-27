@@ -98,6 +98,25 @@ const showQueue = ref(false);
 const immersive = useImmersiveStore();
 const showImmersive = ref(false);
 const immersiveOn = computed(() => immersive.effective.enabled && (immersive.effective.rotation || immersive.effective.room));
+/** Un appui : allumer ou éteindre avec les réglages gardés ; appui long ou clic droit : régler. */
+let pressTimer = 0;
+let longPressed = false;
+function immersiveDown() {
+  longPressed = false;
+  pressTimer = window.setTimeout(() => {
+    longPressed = true;
+    showImmersive.value = true;
+  }, 550);
+}
+function immersiveCancel() {
+  clearTimeout(pressTimer);
+}
+async function immersiveClick() {
+  clearTimeout(pressTimer);
+  if (longPressed) return;
+  const on = await immersive.toggle();
+  ui.notify(on ? `Mode immersif activé : ${describeImmersive(immersive.effective)}` : "Mode immersif désactivé");
+}
 
 function onKey(e: KeyboardEvent) {
   if (e.key !== "Escape") return;
@@ -152,11 +171,20 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
         type="button"
         class="icon-btn"
         :class="{ on: immersiveOn }"
-        :title="`Mode immersif : ${describeImmersive(immersive.effective)}`"
+        :title="`Mode immersif : ${describeImmersive(immersive.effective)} (clic : allumer ou éteindre ; appui long ou clic droit : régler)`"
         aria-label="Mode immersif"
-        @click="showImmersive = true"
+        :aria-pressed="immersiveOn"
+        @pointerdown="immersiveDown"
+        @pointerup="immersiveCancel"
+        @pointerleave="immersiveCancel"
+        @pointercancel="immersiveCancel"
+        @click="immersiveClick"
+        @contextmenu.prevent="showImmersive = true"
       >
         <Icon name="orbit" :size="18" />
+      </button>
+      <button type="button" class="icon-btn tune" title="Régler le mode immersif" aria-label="Régler le mode immersif" @click="showImmersive = true">
+        <Icon name="settings" :size="15" />
       </button>
       <button type="button" class="icon-btn" title="Fermer ce morceau" aria-label="Fermer ce morceau" @click="closeTrack">
         <Icon name="close" :size="18" />
@@ -521,6 +549,13 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
   border-radius: 50%;
   color: rgba(255, 255, 255, 0.8);
   background: rgba(255, 255, 255, 0.08);
+}
+/* Réglages du mode immersif : petit bouton collé à son interrupteur. */
+.view-tools .icon-btn.tune {
+  width: 26px;
+  margin-left: -6px;
+  border-radius: 0 18px 18px 0;
+  background: rgba(255, 255, 255, 0.05);
 }
 .view-tools .icon-btn.on {
   color: #fff;

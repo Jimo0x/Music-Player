@@ -159,6 +159,18 @@ export const useImmersiveStore = defineStore("immersive", {
         // sans moteur (démo) : l'état local suffit
       }
     },
+    /**
+     * Interrupteur en un geste (bouton de « À l'écoute ») : allume ou éteint l'ambiance qui
+     * joue maintenant (celle de la playlist en cours si elle en a une), avec ses réglages
+     * gardés. Allumé sans aucun effet coché : la rotation 8D est cochée.
+     */
+    async toggle(): Promise<boolean> {
+      const target = this.fromPlaylist ? this.profiles.context : null;
+      const s = this.settingsFor(target);
+      const on = !s.enabled;
+      await this.update(target, on && !s.rotation && !s.room ? { enabled: true, rotation: true } : { enabled: on });
+      return on;
+    },
     async setBypass(on: boolean) {
       if (this.bypass === on) return;
       this.bypass = on;
