@@ -1,12 +1,13 @@
 # État du projet
 
-Mis à jour le **26 novembre 2026** : **0.13.0** publiée ; lot **0.14.0 Mode immersif** codé, non publié. À tenir à jour à
+Mis à jour le **27 novembre 2026** : **0.14.0** publiée (Mode immersif), rien en cours. À tenir à jour à
 chaque version : ce qui vient de sortir, ce qui reste, ce qui n'a pas été vérifié.
 
 ## En cours : à reprendre en premier
 
-**Lot 0.14.0 Mode immersif** : codé sur `main` (commit local, non poussé), à essayer au
-casque par le propriétaire avant publication. Cadré avec lui le 26/11 :
+Rien en cours. **0.14.0 publiée le 27/11** (CI verte, 17 fichiers, `latest.json` 9 plateformes).
+À écouter au casque par le propriétaire (bureau, Pixel 6 Pro) : non fait avant publication.
+Repères du lot (cadré avec lui le 26/11) :
 - **Rotation 8D** (le son, ramené au centre, tourne autour de la tête ; vitesse 2 à 40
   tours/min, sens, intensité) avec **deux moteurs au choix** : *tête simplifiée* (modèle
   sphérique de Brown et Duda : décalage et ombre entre les oreilles, assourdi derrière) et
@@ -28,13 +29,14 @@ casque par le propriétaire avant publication. Cadré avec lui le 26/11 :
   « Comparer », mode léger et saut pendant la lecture, sans erreur ; réglages bien enregistrés.
   **Pas encore écouté à l'oreille.** Deux FLAC de Damso (« Vieux Sons ») refusent de se lire :
   fichiers remplis de zéros, sans rapport avec ce lot.
-- Reste avant publication : écoute au casque (bureau et Pixel 6 Pro), nouveautés de la 0.14.0
-  dans `src/nouveautes.json`, montée de version.
+- « Essayer » des nouveautés mène à la section `mode-immersif` des Réglages (`section` de la
+  route `settings`).
 
 ## Versions récentes
 
 | Version | Date | Contenu principal |
 | --- | --- | --- |
+| 0.14.0 | 27/11/2026 | Lot Mode immersif : rotation 8D (tête simplifiée Brown-Duda ou tête mesurée SADIE II), acoustique de salle (6 salles, Freeverb), réglages globaux et par playlist, panneau dans les Réglages, boutons dans « À l'écoute » et sur chaque playlist |
 | 0.13.0 | 26/11/2026 | Lot Ludique : vraie forme d'onde du morceau (Rust, `waveform.rs`, en cache) ; 6 styles de barre de progression sur « À l'écoute » (classique, vague, forme d'onde, perles, néon, segments) ; égaliseur 10 bandes (32 Hz à 16 kHz, anciens réglages à 3 bandes convertis) avec courbe à façonner, spectre en direct, 13 préréglages et « Comparer » ; choix de la sortie audio sur ordinateur ; « Quoi de neuf ? » en cartes avec « Essayer » ; accès rapides Télécharger et baladeur sur l'accueil du téléphone |
 | 0.12.0 | 26/11/2026 | Lot Personnalisation : arrière-plan (image ou pochette en cours, flou, voile, cadrage) ; motifs sur le fond ; couleurs avancées d'un thème ; jeu d'icônes SVG importé et nettoyé ; jaquettes faites des pochettes (une ou mosaïque de 4) ; paquet de thème complet `.mptheme` |
 | 0.11.1 | 21/11/2026 | Partage par code fiable (contributeur, #21) : bogue 103 → 97 corrigé (doublons répartis sur deux parties), reprise 30 min puis avec le même code, avancement de tout l'envoi, résumé à l'arrivée ; `latest.json` écrit par une seule tâche CI (#20) |
