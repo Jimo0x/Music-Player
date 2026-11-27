@@ -101,7 +101,9 @@ branche `sauvegarde-main-avant-nettoyage` supprimée (ancienne tête `d42bc2a`).
   spotDL intègre la pochette). Diagnostic et correctif détaillés dans le ticket.
 - #26 Reconnaître un son (écoute, fredonnement, bouts de paroles) : évaluation des services
   (aucun gratuit et fiable pour l'écoute et le fredonnement ; LRCLIB ne cherche pas dans les
-  paroles), étape 0 d'essais réels avant tout code, puis paroles d'abord.
+  paroles), étape 0 d'essais réels avant tout code, puis paroles d'abord. Décision du 28/11 :
+  écoute et fredonnement par **notre propre outil** intégré (empreinte à repères, recherche par
+  mélodie), alternatives possibles si les essais le justifient.
 
 ## Vérifications sur de vrais appareils
 
