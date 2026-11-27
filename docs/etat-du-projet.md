@@ -74,29 +74,29 @@ ont été supprimés le 20/11 avec l'accord du propriétaire.
 
 ## À faire ensuite
 
-**0.14.0 Mode immersif** : codé, voir « En cours ».
-
 **Ensuite** :
-- Notifications comme WhatsApp, appli fermée : notifications poussées par le relais via
-  Firebase Cloud Messaging (projet Firebase gratuit à créer par le propriétaire), la
-  vérification actuelle gardée en secours pour les téléphones sans services Google.
+- Notifications comme WhatsApp, appli fermée (#22, Jimo0x).
 - Lecteur plein écran sur l'écran verrouillé Android, façon Apple Music (option B, 18/11).
 - Vérifications sur de vrais appareils (liste plus bas).
-- Traduction Français / English / langue du système (décision du 19/11 : plus tard ;
-  environ 1 200 textes).
+- Traduction Français / English / langue du système (#23, Jimo0x).
 - Revue de sécurité, puis optimisation poussée.
 
 ### Points en attente d'une décision du propriétaire
 
-- **Fichiers d'outillage publiés dans le dépôt**, contraire à sa règle globale : le fichier de
-  consignes à la racine (suivi depuis `6fa2185`, bien que listé dans `.git/info/exclude`), le
-  lien du README vers lui et le document de prompt dans `docs/`. Proposé : retirer le fichier
-  du suivi (`git rm --cached`, il reste sur le disque), retirer le lien et le document.
-- Supprimer `C:\Android\sdk` et `C:\Android\dl` (≈ 3,6 Go inutiles).
-- Supprimer la branche locale `sauvegarde-main-avant-nettoyage` (ancien `main`, voir
-  « Contributeur »).
-- Rendre la tâche CI « commits » obligatoire dans la protection de `main` (réglage GitHub,
-  à faire par le propriétaire ; elle a déjà tourné sur des demandes de fusion).
+- Rendre la tâche CI « commits » obligatoire : vérifié le 27/11, la règle « Protection de
+  main » n'exige que `test` (réglage GitHub, par le propriétaire).
+
+Réglé le 27/11 : notes de travail internes retirées du suivi (gardées en local, ignorées par
+`.git/info/exclude`) ; `C:\Android\sdk` et `C:\Android\dl` supprimés (`C:\Android\jdk-17` gardé) ;
+branche `sauvegarde-main-avant-nettoyage` supprimée (ancienne tête `d42bc2a`).
+
+### Confié au contributeur (Jimo0x, 27/11)
+
+- #22 Notifications poussées appli fermée (Firebase Cloud Messaging, projet Firebase gratuit
+  créé par lui, propriétaire ajouté comme Propriétaire ; secrets transmis en privé).
+- #23 Traduction Français / English / langue du système.
+- #24 Lignes `Co-authored-by:` automatiques dans ses branches et son fork (le `main` du dépôt
+  est propre).
 
 ## Vérifications sur de vrais appareils
 
