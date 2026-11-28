@@ -2153,6 +2153,11 @@ chaquopy {
         pyc {
             src = false
         }
+        // mutagen : seul embarqueur de pochette que yt-dlp sache utiliser sans ffmpeg (#25,
+        // mp_ytdlp.py).
+        pip {
+            install("mutagen")
+        }
     }
 }
 `;

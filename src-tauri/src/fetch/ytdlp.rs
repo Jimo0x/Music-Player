@@ -435,8 +435,12 @@ fn run_download(runner: Runner, query: &str, attempt_dir: &Path, cancel: &Atomic
         .arg("--audio-quality")
         .arg("0")
         .arg("--embed-metadata")
+        .arg("--embed-thumbnail")
+        // webp (format courant des vignettes YouTube) ne s'intègre pas partout : converti pour
+        // que la pochette se lise sur toutes les versions installées (#25).
+        .arg("--convert-thumbnails")
+        .arg("jpg")
         .arg("--no-write-info-json")
-        .arg("--no-write-thumbnail")
         .arg("--restrict-filenames")
         .arg("--retries")
         .arg("3")

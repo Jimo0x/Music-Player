@@ -5,6 +5,11 @@
 # Pas de ffmpeg sur téléphone : le son est pris tel que YouTube le sert, de préférence en AAC
 # (.m4a), que le lecteur de l'appli lit directement. Les étiquettes sont écrites ensuite par
 # l'appli (Rust).
+#
+# Pochette (#25) : embarquée ici par yt-dlp via mutagen (package pip ajouté par
+# scripts/android-patch.mjs), seul embarqueur de vignette que yt-dlp sache utiliser sans
+# ffmpeg. Marche pour l'AAC/.m4a demandé en priorité ; un format de repli que mutagen ne sait
+# pas illustrer (webm, par exemple) reste simplement sans pochette, comme avant ce correctif.
 
 import json
 import os
@@ -88,6 +93,10 @@ def download(zip_path, url, out_dir):
         "retries": 3,
         "fragment_retries": 3,
         "progress_hooks": [_hook],
+        # Pochette (#25) : vignette gardée seulement le temps de l'embarquer (mutagen, sans
+        # ffmpeg), pas de fichier à côté du son.
+        "writethumbnail": True,
+        "postprocessors": [{"key": "EmbedThumbnail"}],
     }
     with yt_dlp.YoutubeDL(options) as ydl:
         info = ydl.extract_info(url, download=True) or {}
