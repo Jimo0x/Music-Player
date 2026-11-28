@@ -1386,13 +1386,14 @@ fn remote_send_parts(
     let group = uuid::Uuid::new_v4().simple().to_string();
     let count = parts.len();
     let tracks: usize = parts.iter().map(Vec::len).sum();
+    let lyrics_dir = app.state::<AppState>().lyrics_dir();
     std::thread::spawn(move || {
         let mut first = Some(pending);
         let result = (|| -> Result<(), String> {
             for (i, part) in parts.iter().enumerate() {
                 crate::transfer::cancelled(&cancel)?;
                 let path = dir.join(format!("{group}-{i}.{}", sharing::EXTENSION));
-                let prepared = sharing::export_playlist_part(&path, &name, theme.clone(), part)
+                let prepared = sharing::export_playlist_part(&path, &name, theme.clone(), part, Some(&lyrics_dir))
                     .and_then(|()| std::fs::metadata(&path).map(|m| m.len()).map_err(|e| e.to_string()));
                 let size = match prepared {
                     Ok(size) => size,

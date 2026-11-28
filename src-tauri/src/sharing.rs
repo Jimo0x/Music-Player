@@ -32,6 +32,10 @@ struct ManifestTrack {
     has_cover: bool,
     /// Nom du fichier dans l'archive (dossier « pistes/ »).
     file: String,
+    /// Paroles synchronisées à poser à côté du son reçu (`.lrc`), si on en avait. Absent sur
+    /// une archive plus ancienne, ou si ce morceau n'avait que du texte sans minutage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    lyrics_lrc: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,6 +85,7 @@ fn write_bundle(
     name: &str,
     theme: Option<String>,
     tracks: &[Track],
+    lyrics_dir: Option<&Path>,
 ) -> Result<(), String> {
     let file = fs::File::create(dest).map_err(|e| e.to_string())?;
     let mut zip = zip::ZipWriter::new(file);
@@ -125,6 +130,7 @@ fn write_bundle(
             duration_secs: track.duration_secs,
             has_cover: track.has_cover,
             file: filename,
+            lyrics_lrc: lyrics_dir.and_then(|dir| crate::lyrics::lrc_for_export(track, dir)),
         });
     }
 
@@ -141,7 +147,7 @@ fn write_bundle(
 pub fn export_track(state: &AppState, dest: &Path, track_id: &str) -> Result<(), String> {
     let track = state.find_track(track_id).ok_or("Morceau introuvable.")?;
     let name = track.title.clone();
-    write_bundle(dest, "track", &name, None, std::slice::from_ref(&track))
+    write_bundle(dest, "track", &name, None, std::slice::from_ref(&track), Some(&state.lyrics_dir()))
 }
 
 /// Exporte plusieurs morceaux d'un coup (copie vers un autre de mes appareils). Ceux qui ne
@@ -154,7 +160,7 @@ pub fn export_tracks(state: &AppState, dest: &Path, name: &str, track_ids: &[Str
     if tracks.is_empty() {
         return Err("Aucun de ces morceaux n'est encore sur cet appareil.".to_string());
     }
-    write_bundle(dest, "track", name, None, &tracks)?;
+    write_bundle(dest, "track", name, None, &tracks, Some(&state.lyrics_dir()))?;
     Ok(tracks.len())
 }
 
@@ -204,8 +210,14 @@ fn split_parts(tracks: Vec<Track>, size_of: impl Fn(&Track) -> u64) -> Vec<Vec<T
 }
 
 /// Exporte une partie de playlist (envoi par cycles).
-pub fn export_playlist_part(dest: &Path, name: &str, theme: Option<String>, tracks: &[Track]) -> Result<(), String> {
-    write_bundle(dest, "playlist", name, theme, tracks)
+pub fn export_playlist_part(
+    dest: &Path,
+    name: &str,
+    theme: Option<String>,
+    tracks: &[Track],
+    lyrics_dir: Option<&Path>,
+) -> Result<(), String> {
+    write_bundle(dest, "playlist", name, theme, tracks, lyrics_dir)
 }
 
 /// Exporte une playlist entière (ses morceaux encore présents dans la bibliothèque).
@@ -224,7 +236,7 @@ pub fn export_playlist(state: &AppState, dest: &Path, playlist_id: &str) -> Resu
     if tracks.is_empty() {
         return Err("Cette playlist est vide (ou ses morceaux ne sont plus dans la bibliothèque).".to_string());
     }
-    write_bundle(dest, "playlist", &name, theme, &tracks)
+    write_bundle(dest, "playlist", &name, theme, &tracks, Some(&state.lyrics_dir()))
 }
 
 /// Ancien dossier des morceaux reçus (privé, invisible hors de l'appli) : repli quand le
@@ -471,6 +483,15 @@ pub fn import_bundle_part(state: &AppState, source: &Path, into: Option<&str>, f
             let _ = fs::remove_file(&local_path);
             skipped += 1;
             continue;
+        }
+
+        // Paroles synchronisées jointes à l'archive : posées à côté du son, comme un `.lrc`
+        // que l'utilisateur aurait lui-même déposé là (prioritaire sur toute recherche, #25
+        // « les paroles ne se synchronisent pas en même temps que la musique »).
+        if let Some(lrc) = &entry.lyrics_lrc {
+            if !lrc.trim().is_empty() {
+                let _ = fs::write(local_path.with_extension("lrc"), lrc);
+            }
         }
 
         // Les métadonnées viennent du manifeste (fiables : celles de la bibliothèque d'origine),

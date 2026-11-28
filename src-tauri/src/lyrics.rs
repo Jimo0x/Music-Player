@@ -1440,6 +1440,34 @@ pub fn unsynced_text(track: &Track, cache_dir: &Path) -> Option<Lyrics> {
         .filter(|l| l.synced.is_none() && !l.instrumental && l.plain.as_deref().is_some_and(|p| !p.trim().is_empty()))
 }
 
+/// Paroles à joindre quand ce morceau part dans une archive de partage (`sharing.rs`), en
+/// texte `.lrc` : le fichier posé à côté du son, tel quel (minutage mot par mot compris),
+/// sinon les paroles synchronisées retenues pour ce morceau (alignées tout seul ou choisies),
+/// rendues en LRC. Rien si on n'a que du texte sans minutage : l'appareil qui reçoit le
+/// retrouvera de son côté, et ça ne vaut pas la peine de l'envoyer comme s'il était synchronisé.
+/// Sans ça, l'autre appareil repartait de zéro (nouvelle recherche, parfois une version qui ne
+/// correspond pas ou pas trouvée du tout) pendant que l'envoi du son, lui, était immédiat.
+pub fn lrc_for_export(track: &Track, cache_dir: &Path) -> Option<String> {
+    for ext in ["lrc", "LRC"] {
+        if let Ok(text) = std::fs::read_to_string(Path::new(&track.path).with_extension(ext)) {
+            if !text.trim().is_empty() {
+                return Some(text);
+            }
+        }
+    }
+    let lines = read_entry(cache_dir, &track.id)?.lyrics?.synced?;
+    (!lines.is_empty()).then(|| render_lrc(&lines))
+}
+
+fn render_lrc(lines: &[LyricLine]) -> String {
+    lines.iter().map(|l| format!("[{}]{}", format_lrc_timestamp(l.time_ms), l.text)).collect::<Vec<_>>().join("\n")
+}
+
+fn format_lrc_timestamp(ms: u64) -> String {
+    let cs = ms / 10;
+    format!("{:02}:{:02}.{:02}", cs / 6000, (cs / 100) % 60, cs % 100)
+}
+
 /// Retient la version synchronisée automatiquement (align.rs) à la place du texte seul, en
 /// gardant un éventuel choix de l'utilisateur (paroles choisies à la main restent épinglées).
 pub fn store_aligned(track: &Track, cache_dir: &Path, mut lyrics: Lyrics, lines: Vec<LyricLine>) -> Lyrics {
