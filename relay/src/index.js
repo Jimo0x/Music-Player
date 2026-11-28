@@ -8,9 +8,14 @@
 // 2. Proches (profils) : chaque appareil qui l'active a un code d'ami (« K7QM-2D9X »). On
 //    s'ajoute par ce code ; l'ajout n'aboutit que si l'autre accepte. Le relais garde pour
 //    chaque profil son nom, ce qu'il écoute en ce moment (effacé au bout d'une heure), les
-//    demandes en attente, les messages chiffrés (60 jours) et la liste des amis autorisés à lire
-//    ce statut, rien d'autre. Un profil sans activité pendant un an est effacé, et son
-//    propriétaire peut l'effacer à tout moment.
+//    demandes en attente, les messages chiffrés (60 jours), la liste des amis autorisés à lire
+//    ce statut, et les jetons FCM de ses appareils liés (#22), rien d'autre. Un profil sans
+//    activité pendant un an est effacé, et son propriétaire peut l'effacer à tout moment.
+//    Notifications poussées (#22) : un message ou une demande de proche pousse une notification
+//    par Firebase Cloud Messaging (jamais le contenu, chiffré de bout en bout) aux jetons
+//    enregistrés. Sans la clé de compte de service (secret Wrangler FCM_SERVICE_ACCOUNT, posée
+//    par le propriétaire), ces appels ne font rien : la vérification périodique côté appli
+//    (ProchesService, Android) reste alors le seul moyen de recevoir un message appli fermée.
 //
 // 3. Zone (sur option) : annuaire des profils qui ont choisi d'être visibles des personnes de
 //    leur ville, d'après l'adresse IP vue par Cloudflare (jamais de position GPS). Une
@@ -91,6 +96,98 @@ async function readJson(request, max = MAX_BODY) {
 async function sha256(text) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// --- Notifications poussées (#22) -------------------------------------------------------
+// Sans la clé de compte de service (secret Wrangler FCM_SERVICE_ACCOUNT), ces fonctions ne
+// font rien : la vérification périodique (ProchesService, appli Android) reste le seul moyen
+// de recevoir un message appli fermée, comme avant.
+const FCM_TOKEN = /^[A-Za-z0-9_:.\-]{50,400}$/;
+/** Appareils liés au plus par profil (comme MAX_FRIENDS, pour ne pas faire grossir le stockage
+ * d'un profil sans limite). */
+const MAX_FCM_TOKENS = 10;
+
+function base64url(bytes) {
+  let bin = "";
+  for (const b of new Uint8Array(bytes)) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function pemToArrayBuffer(pem) {
+  const b64 = pem.replace(/-----(BEGIN|END) PRIVATE KEY-----/g, "").replace(/\s+/g, "");
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
+/** Jeton d'accès Google (compte de service), gardé en mémoire tant qu'il est valide : un par
+ * isolate Cloudflare, ce qui suffit à ne pas le redemander à chaque message. */
+let fcmAccessToken = null;
+
+async function fcmAccessTokenFor(serviceAccount) {
+  const now = Math.floor(Date.now() / 1000);
+  if (fcmAccessToken && fcmAccessToken.exp > now + 60) return fcmAccessToken.token;
+  const header = base64url(new TextEncoder().encode(JSON.stringify({ alg: "RS256", typ: "JWT" })));
+  const claims = base64url(
+    new TextEncoder().encode(
+      JSON.stringify({
+        iss: serviceAccount.client_email,
+        scope: "https://www.googleapis.com/auth/firebase.messaging",
+        aud: "https://oauth2.googleapis.com/token",
+        iat: now,
+        exp: now + 3600,
+      }),
+    ),
+  );
+  const unsigned = `${header}.${claims}`;
+  const key = await crypto.subtle.importKey("pkcs8", pemToArrayBuffer(serviceAccount.private_key), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const signature = base64url(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned)));
+  const resp = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${unsigned}.${signature}`,
+  });
+  if (!resp.ok) throw new Error("Jeton Google refusé");
+  const data = await resp.json();
+  fcmAccessToken = { token: data.access_token, exp: now + (Number(data.expires_in) || 3600) };
+  return fcmAccessToken.token;
+}
+
+/** Pousse une notification (titre + corps en clair, jamais le contenu déchiffré d'un mot) à
+ * des jetons FCM déjà validés par leur forme. Renvoie ceux que FCM a refusés (appli
+ * désinstallée, par exemple : code `UNREGISTERED`), à oublier par l'appelant. */
+async function notifierPoussee(env, jetons, titre, corps) {
+  if (!env.FCM_SERVICE_ACCOUNT || !jetons.length) return [];
+  let compte;
+  let acces;
+  try {
+    compte = JSON.parse(env.FCM_SERVICE_ACCOUNT);
+    acces = await fcmAccessTokenFor(compte);
+  } catch {
+    return [];
+  }
+  const url = `https://fcm.googleapis.com/v1/projects/${compte.project_id}/messages:send`;
+  const refuses = [];
+  for (const jeton of jetons) {
+    let resp;
+    try {
+      resp = await fetch(url, {
+        method: "POST",
+        headers: { authorization: `Bearer ${acces}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          message: { token: jeton, notification: { title: titre, body: corps }, android: { priority: "high", notification: { channel_id: "proches" } } },
+        }),
+      });
+    } catch {
+      continue;
+    }
+    if (resp.status === 404 || resp.status === 400) {
+      const detail = await resp.json().catch(() => null);
+      if (detail?.error?.details?.some((d) => d.errorCode === "UNREGISTERED")) refuses.push(jeton);
+    }
+  }
+  return refuses;
 }
 
 function clean(text, max) {
@@ -326,8 +423,19 @@ export class Salle {
 
 /** Profil d'un appareil : carte publique (nom, photo), statut d'écoute, demandes, amis. */
 export class Profil {
-  constructor(state) {
+  constructor(state, env) {
     this.state = state;
+    this.env = env;
+  }
+
+  /** Pousse une notification (FCM) aux appareils liés de ce profil ; sans effet si aucun
+   * appareil n'en a donné (pas de services Google, ou push pas encore activé) ou sans la clé
+   * de compte de service (`notifierPoussee`). Les jetons refusés sont oubliés. */
+  async pousser(titre, corps) {
+    const jetons = (await this.state.storage.get("fcm")) ?? [];
+    if (!jetons.length) return;
+    const refuses = await notifierPoussee(this.env, jetons.map((j) => j.jeton), titre, corps);
+    if (refuses.length) await this.state.storage.put("fcm", jetons.filter((j) => !refuses.includes(j.jeton)));
   }
 
   async owner(secret) {
@@ -470,6 +578,11 @@ export class Profil {
           const entry = { type: "mot", de: body.de, texte, piece, chiffre, at: Date.now() };
           await this.toInbox(entry, MAX_WORDS);
           await this.toJournal(entry);
+          // Nom affiché dans la notification : la carte publique de l'expéditeur (jamais le
+          // contenu, chiffré de bout en bout, que le relais ne peut pas lire).
+          const carte = await profile(this.env, body.de).fetch(new Request(`https://profil/v1/profil/${body.de}/carte`));
+          const nom = carte.ok ? (await carte.json())?.nom : null;
+          await this.pousser("Nouveau message", `${nom || "Un proche"} vous a écrit.`);
           return json({ ok: true });
         }
         if (!["demande", "accord", "retrait"].includes(body.type)) return json({ erreur: "Message inconnu" }, 400);
@@ -492,6 +605,25 @@ export class Profil {
         };
         await this.toInbox(entry, MAX_INBOX, (m) => !(m.de === body.de && m.type === body.type));
         await this.toJournal(entry);
+        if (body.type === "demande") await this.pousser("Demande de proche", `${entry.nom || "Quelqu'un"} souhaite devenir proche.`);
+        if (body.type === "accord") await this.pousser("Proche accepté", `${entry.nom || "Quelqu'un"} a accepté votre demande.`);
+        return json({ ok: true });
+      }
+      // Jeton FCM d'un appareil lié : enregistré (ou renouvelé) pour recevoir les push de ce
+      // profil ; retiré quand l'appareil désactive les notifications instantanées, se délie,
+      // ou que le propriétaire efface ses données (storage.deleteAll couvre déjà ce dernier cas).
+      case "fcm": {
+        if (!(await this.owner(body.secret))) return json({ erreur: "Refusé" }, 403);
+        if (!FCM_TOKEN.test(body.jeton ?? "")) return json({ erreur: "Jeton invalide" }, 400);
+        const jetons = ((await storage.get("fcm")) ?? []).filter((j) => j.jeton !== body.jeton);
+        jetons.push({ jeton: body.jeton, at: Date.now() });
+        await storage.put("fcm", jetons.slice(-MAX_FCM_TOKENS));
+        return json({ ok: true });
+      }
+      case "fcmretirer": {
+        if (!(await this.owner(body.secret))) return json({ erreur: "Refusé" }, 403);
+        const jetons = ((await storage.get("fcm")) ?? []).filter((j) => j.jeton !== body.jeton);
+        await storage.put("fcm", jetons);
         return json({ ok: true });
       }
       // Journal (plusieurs appareils sur un même profil) : messages reçus et ce que font les
