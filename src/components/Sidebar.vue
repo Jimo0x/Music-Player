@@ -10,6 +10,7 @@ import PlaylistCover from "./PlaylistCover.vue";
 import FriendAvatar from "./FriendAvatar.vue";
 import { useFriendsStore } from "@/stores/friends";
 import { useAvisStore } from "@/stores/avis";
+import { t } from "@/lib/i18n";
 
 const ui = useUiStore();
 const library = useLibraryStore();
@@ -51,8 +52,8 @@ function newPlaylist() {
         ref="searchInput"
         :value="ui.search"
         type="search"
-        placeholder="Rechercher"
-        aria-label="Rechercher dans la bibliothèque"
+        :placeholder="t('Rechercher')"
+        :aria-label="t('Rechercher dans la bibliothèque')"
         @input="ui.setSearch(($event.target as HTMLInputElement).value)"
         @click="ui.reopenSearch()"
         @keydown.enter="ui.reopenSearch()"
@@ -60,8 +61,8 @@ function newPlaylist() {
       />
     </label>
 
-    <nav class="section" aria-label="Bibliothèque">
-      <p class="section-title">Bibliothèque</p>
+    <nav class="section" :aria-label="t('Bibliothèque')">
+      <p class="section-title">{{ t("Bibliothèque") }}</p>
       <button
         v-for="item in nav"
         :key="item.name"
@@ -71,7 +72,7 @@ function newPlaylist() {
         @click="ui.go({ name: item.name })"
       >
         <Icon :name="item.icon" :size="17" class="ico" />
-        {{ item.label }}
+        {{ t(item.label) }}
       </button>
       <button
         v-if="library.voices.length"

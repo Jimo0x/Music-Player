@@ -19,6 +19,7 @@ import DamagedFiles from "@/components/DamagedFiles.vue";
 import BackupSection from "@/components/BackupSection.vue";
 import DevicesSection from "@/components/DevicesSection.vue";
 import NotificationsSection from "@/components/NotificationsSection.vue";
+import LanguageSection from "@/components/LanguageSection.vue";
 import AdminAccess from "@/components/AdminAccess.vue";
 import Icon from "@/components/Icon.vue";
 import LegalDialog from "@/components/LegalDialog.vue";
@@ -239,6 +240,7 @@ const shortcuts = [
     </section>
 
     <DamagedFiles />
+    <LanguageSection />
     <DevicesSection />
     <NotificationsSection />
     <BackupSection />
