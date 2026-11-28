@@ -86,6 +86,15 @@ const en: Record<string, string> = {
   Anglais: "English",
   "L'interface s'affiche dans cette langue ; « Langue du système » la reprend sur celle de votre appareil (français si ce n'est pas l'anglais).":
     "The interface is shown in this language; “System language” follows your device's language (French if it isn't English).",
+  // Titres aimés
+  Terminer: "Done",
+  Sélectionner: "Select",
+  "Tout en aléatoire": "Shuffle all",
+  Trier: "Sort",
+  "Trier les titres aimés": "Sort liked songs",
+  "Ordre de la bibliothèque": "Library order",
+  "Aucun morceau aimé pour l'instant : touchez le cœur dans le menu d'un morceau (clic droit, ou « ⋯ »).":
+    "No liked songs yet: tap the heart in a song's menu (right-click, or “⋯”).",
 };
 
 export function t(fr: string): string {

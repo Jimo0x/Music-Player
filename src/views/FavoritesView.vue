@@ -13,6 +13,7 @@ import VirtualList from "@/components/VirtualList.vue";
 import { remembered } from "@/lib/remember";
 import { SORTS, sortTracks } from "@/lib/trackSort";
 import type { Track } from "@/lib/types";
+import { t } from "@/lib/i18n";
 
 const library = useLibraryStore();
 const favorites = useFavoritesStore();
@@ -46,27 +47,27 @@ function play(index: number) {
   <div class="page">
     <div class="top">
       <div>
-        <h1 class="page-title">Titres aimés</h1>
+        <h1 class="page-title">{{ t("Titres aimés") }}</h1>
         <p class="page-sub">{{ formatCollection(tracks.length, totalDuration) }}</p>
       </div>
       <div v-if="tracks.length" class="top-actions">
         <button type="button" class="pill pill-ghost" :class="{ on: ui.selecting }" @click="ui.selecting ? ui.clearSelection() : ui.startSelection()">
-          <Icon name="check" :size="15" /> {{ ui.selecting ? "Terminer" : "Sélectionner" }}
+          <Icon name="check" :size="15" /> {{ ui.selecting ? t("Terminer") : t("Sélectionner") }}
         </button>
         <button type="button" class="pill pill-ghost" @click="player.playShuffled(tracks.map((t) => t.id))">
-          <Icon name="shuffle" :size="15" /> Tout en aléatoire
+          <Icon name="shuffle" :size="15" /> {{ t("Tout en aléatoire") }}
         </button>
       </div>
     </div>
     <label v-if="tracks.length > 1" class="sort">
-      <span class="muted">Trier</span>
-      <select v-model="sortId" class="fieldbox" aria-label="Trier les titres aimés">
-        <option value="perso">Ordre de la bibliothèque</option>
+      <span class="muted">{{ t("Trier") }}</span>
+      <select v-model="sortId" class="fieldbox" :aria-label="t('Trier les titres aimés')">
+        <option value="perso">{{ t("Ordre de la bibliothèque") }}</option>
         <option v-for="s in SORTS" :key="s.id" :value="s.id">{{ s.label }}</option>
       </select>
     </label>
     <p v-if="!tracks.length" class="empty">
-      Aucun morceau aimé pour l'instant : touchez le cœur dans le menu d'un morceau (clic droit, ou « ⋯ »).
+      {{ t("Aucun morceau aimé pour l'instant : touchez le cœur dans le menu d'un morceau (clic droit, ou « ⋯ »).") }}
     </p>
     <VirtualList v-else :items="tracks" :row-height="52">
       <template #default="{ item, index }">
